@@ -126,7 +126,7 @@ func cmdRun(file string) {
 		fmt.Fprintf(os.Stderr, "build error: %v\n", err)
 		os.Exit(1)
 	}
-	engine := blueprint.NewEngine(g)
+	engine := blueprint.NewEngine(g, bp.Name)
 	fmt.Printf("Running blueprint %q (dry-run with mock executor)...\n", bp.Name)
 	state, err := engine.Execute(context.Background())
 	if err != nil {

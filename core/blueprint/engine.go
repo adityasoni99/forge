@@ -10,11 +10,16 @@ const DefaultMaxIterations = 100
 
 type Engine struct {
 	graph         *Graph
+	blueprintName string
 	maxIterations int
 }
 
-func NewEngine(g *Graph) *Engine {
-	return &Engine{graph: g, maxIterations: DefaultMaxIterations}
+func NewEngine(g *Graph, blueprintName string) *Engine {
+	return &Engine{
+		graph:         g,
+		blueprintName: blueprintName,
+		maxIterations: DefaultMaxIterations,
+	}
 }
 
 func (e *Engine) SetMaxIterations(n int) {
@@ -26,7 +31,7 @@ func (e *Engine) Execute(ctx context.Context) (*RunState, error) {
 		return nil, fmt.Errorf("invalid graph: %w", err)
 	}
 
-	state := NewRunState("", fmt.Sprintf("run-%d", time.Now().UnixNano()))
+	state := NewRunState(e.blueprintName, fmt.Sprintf("run-%d", time.Now().UnixNano()))
 	state.Status = NodeStatusRunning
 	state.StartTime = time.Now()
 	state.CurrentNode = e.graph.StartNode()

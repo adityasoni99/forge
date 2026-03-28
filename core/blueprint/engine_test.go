@@ -18,8 +18,20 @@ func buildLinearGraph() *Graph {
 	return g
 }
 
+func TestEngineBlueprintNamePopulated(t *testing.T) {
+	const wantName = "my-test-blueprint"
+	engine := NewEngine(buildLinearGraph(), wantName)
+	state, err := engine.Execute(context.Background())
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if state.BlueprintName != wantName {
+		t.Errorf("BlueprintName = %q, want %q", state.BlueprintName, wantName)
+	}
+}
+
 func TestEngineLinearExecution(t *testing.T) {
-	engine := NewEngine(buildLinearGraph())
+	engine := NewEngine(buildLinearGraph(), "test-blueprint")
 	state, err := engine.Execute(context.Background())
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -53,7 +65,7 @@ func buildGatedGraph() *Graph {
 }
 
 func TestEngineGatePass(t *testing.T) {
-	engine := NewEngine(buildGatedGraph())
+	engine := NewEngine(buildGatedGraph(), "test-blueprint")
 	state, err := engine.Execute(context.Background())
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -79,7 +91,7 @@ func TestEngineGateFailMaxIterations(t *testing.T) {
 	_ = g.AddEdge(Edge{From: "gate", To: "implement", Condition: "fail"})
 	_ = g.SetStartNode("implement")
 
-	engine := NewEngine(g)
+	engine := NewEngine(g, "test-blueprint")
 	engine.SetMaxIterations(9) // 3 loop iterations * 3 nodes = 9
 	_, err := engine.Execute(context.Background())
 	if err == nil {
@@ -90,7 +102,7 @@ func TestEngineGateFailMaxIterations(t *testing.T) {
 func TestEngineContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	engine := NewEngine(buildLinearGraph())
+	engine := NewEngine(buildLinearGraph(), "test-blueprint")
 	_, err := engine.Execute(ctx)
 	if err == nil {
 		t.Fatal("expected context cancelled error")
@@ -99,7 +111,7 @@ func TestEngineContextCancellation(t *testing.T) {
 
 func TestEngineInvalidGraph(t *testing.T) {
 	g := NewGraph() // empty, no start node
-	engine := NewEngine(g)
+	engine := NewEngine(g, "test-blueprint")
 	_, err := engine.Execute(context.Background())
 	if err == nil {
 		t.Fatal("expected invalid graph error")
@@ -120,7 +132,7 @@ func TestEngineNodeExecuteReturnsError(t *testing.T) {
 	g := NewGraph()
 	_ = g.AddNode(&errorExecuteNode{id: "bad"})
 	_ = g.SetStartNode("bad")
-	_, err := NewEngine(g).Execute(context.Background())
+	_, err := NewEngine(g, "test-blueprint").Execute(context.Background())
 	if err == nil {
 		t.Fatal("expected error when node Execute returns non-nil error")
 	}
@@ -132,7 +144,7 @@ func TestEngineNextNodeNotInGraph(t *testing.T) {
 	_ = g.AddNode(&stubNode{id: "a"})
 	_ = g.SetStartNode("a")
 	g.adjacency["a"] = []Edge{{From: "a", To: "ghost", Condition: ""}}
-	_, err := NewEngine(g).Execute(context.Background())
+	_, err := NewEngine(g, "test-blueprint").Execute(context.Background())
 	if err == nil {
 		t.Fatal("expected error when current node id is missing from graph")
 	}
@@ -144,7 +156,7 @@ func TestEngineGateNoOutgoingEdges(t *testing.T) {
 	_ = g.AddNode(NewGateNode("g", "prep"))
 	_ = g.AddEdge(Edge{From: "prep", To: "g"})
 	_ = g.SetStartNode("prep")
-	state, err := NewEngine(g).Execute(context.Background())
+	state, err := NewEngine(g, "test-blueprint").Execute(context.Background())
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
