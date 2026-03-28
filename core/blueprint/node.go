@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -32,4 +33,30 @@ func (n *DeterministicNode) Execute(ctx context.Context, _ *RunState) (NodeResul
 		Status: NodeStatusPassed,
 		Output: strings.TrimSpace(string(output)),
 	}, nil
+}
+
+type GateNode struct {
+	id          string
+	checkNodeID string
+}
+
+func NewGateNode(id, checkNodeID string) *GateNode {
+	return &GateNode{id: id, checkNodeID: checkNodeID}
+}
+
+func (n *GateNode) ID() string     { return n.id }
+func (n *GateNode) Type() NodeType { return NodeTypeGate }
+
+func (n *GateNode) Execute(_ context.Context, state *RunState) (NodeResult, error) {
+	prev, ok := state.NodeResults[n.checkNodeID]
+	if !ok {
+		return NodeResult{
+			Status: NodeStatusFailed,
+			Error:  fmt.Sprintf("gate %q: checked node %q has no result", n.id, n.checkNodeID),
+		}, nil
+	}
+	if prev.Status == NodeStatusPassed {
+		return NodeResult{Status: NodeStatusPassed}, nil
+	}
+	return NodeResult{Status: NodeStatusFailed}, nil
 }
