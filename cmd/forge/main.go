@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+	"sort"
+	"strings"
 
+	"github.com/aditya-soni/forge/blueprints"
 	"github.com/aditya-soni/forge/core/blueprint"
 )
 
@@ -91,14 +93,29 @@ func cmdValidate(file string) {
 }
 
 func cmdList() {
-	entries, err := filepath.Glob("blueprints/*.yaml")
-	if err != nil || len(entries) == 0 {
+	entries, err := blueprints.BuiltIn.ReadDir(".")
+	if err != nil {
 		fmt.Println("No blueprints found in blueprints/")
 		return
 	}
-	fmt.Println("Built-in blueprints:")
+	var names []string
 	for _, e := range entries {
-		data, err := os.ReadFile(e)
+		if e.IsDir() {
+			continue
+		}
+		n := e.Name()
+		if strings.HasSuffix(n, ".yaml") || strings.HasSuffix(n, ".yml") {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		fmt.Println("No blueprints found in blueprints/")
+		return
+	}
+	sort.Strings(names)
+	fmt.Println("Built-in blueprints:")
+	for _, name := range names {
+		data, err := blueprints.BuiltIn.ReadFile(name)
 		if err != nil {
 			continue
 		}
