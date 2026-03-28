@@ -60,3 +60,31 @@ func (n *GateNode) Execute(_ context.Context, state *RunState) (NodeResult, erro
 	}
 	return NodeResult{Status: NodeStatusFailed}, nil
 }
+
+type AgenticNode struct {
+	id       string
+	prompt   string
+	config   map[string]interface{}
+	executor AgentExecutor
+}
+
+func NewAgenticNode(id, prompt string, config map[string]interface{}, executor AgentExecutor) *AgenticNode {
+	return &AgenticNode{id: id, prompt: prompt, config: config, executor: executor}
+}
+
+func (n *AgenticNode) ID() string     { return n.id }
+func (n *AgenticNode) Type() NodeType { return NodeTypeAgentic }
+
+func (n *AgenticNode) Execute(ctx context.Context, _ *RunState) (NodeResult, error) {
+	output, err := n.executor.Execute(ctx, n.prompt, n.config)
+	if err != nil {
+		return NodeResult{
+			Status: NodeStatusFailed,
+			Error:  err.Error(),
+		}, nil
+	}
+	return NodeResult{
+		Status: NodeStatusPassed,
+		Output: output,
+	}, nil
+}

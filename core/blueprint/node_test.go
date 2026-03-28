@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -104,5 +105,54 @@ func TestGateNodeIDAndType(t *testing.T) {
 	}
 	if gate.Type() != NodeTypeGate {
 		t.Errorf("Type() = %v, want Gate", gate.Type())
+	}
+}
+
+type mockExecutor struct {
+	output string
+	err    error
+}
+
+func (m *mockExecutor) Execute(_ context.Context, _ string, _ map[string]interface{}) (string, error) {
+	return m.output, m.err
+}
+
+func TestAgenticNodeExecuteSuccess(t *testing.T) {
+	executor := &mockExecutor{output: "plan created"}
+	node := NewAgenticNode("plan", "Create an implementation plan", nil, executor)
+	result, err := node.Execute(context.Background(), NewRunState("test", "run-1"))
+	if err != nil {
+		t.Fatalf("error = %v", err)
+	}
+	if result.Status != NodeStatusPassed {
+		t.Errorf("Status = %v, want Passed", result.Status)
+	}
+	if result.Output != "plan created" {
+		t.Errorf("Output = %q, want %q", result.Output, "plan created")
+	}
+}
+
+func TestAgenticNodeExecuteFailure(t *testing.T) {
+	executor := &mockExecutor{err: fmt.Errorf("agent crashed")}
+	node := NewAgenticNode("plan", "Create a plan", nil, executor)
+	result, err := node.Execute(context.Background(), NewRunState("test", "run-1"))
+	if err != nil {
+		t.Fatalf("should not return Go error, got %v", err)
+	}
+	if result.Status != NodeStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if result.Error == "" {
+		t.Error("expected error message")
+	}
+}
+
+func TestAgenticNodeIDAndType(t *testing.T) {
+	node := NewAgenticNode("plan", "prompt", nil, &mockExecutor{})
+	if node.ID() != "plan" {
+		t.Errorf("ID() = %q, want %q", node.ID(), "plan")
+	}
+	if node.Type() != NodeTypeAgentic {
+		t.Errorf("Type() = %v, want Agentic", node.Type())
 	}
 }
