@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// DeterministicNode runs blueprint-supplied commands via sh -c. Only use blueprint
+// YAML from trusted sources; untrusted input can execute arbitrary shell commands.
 type DeterministicNode struct {
 	id      string
 	command string

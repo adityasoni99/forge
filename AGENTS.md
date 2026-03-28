@@ -19,6 +19,7 @@ Three-layer open-source agent factory. See project.md for full architecture.
 
 ## Conventions
 
-- Google Go Style Guide
+- Google Go Style Guide; tabs for indentation (gofmt standard)
 - TDD: write failing test first, then implement
 - Files under `core/blueprint/` should stay focused (<300 lines each)
+- Security: blueprints must come from trusted sources only; DeterministicNode executes shell commands from blueprint YAML
