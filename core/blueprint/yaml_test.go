@@ -1,6 +1,9 @@
 package blueprint
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 const testYAML = `
 name: test-blueprint
@@ -113,5 +116,30 @@ edges: []
 	_, err := bp.BuildGraph(&mockExecutor{})
 	if err == nil {
 		t.Fatal("expected error for unknown node type")
+	}
+}
+
+func TestBuiltinBlueprintsValid(t *testing.T) {
+	files := []string{
+		"../../blueprints/standard-implementation.yaml",
+		"../../blueprints/bug-fix.yaml",
+	}
+	executor := &mockExecutor{output: "ok"}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		bp, err := ParseBlueprintYAML(data)
+		if err != nil {
+			t.Fatalf("parse %s: %v", f, err)
+		}
+		g, err := bp.BuildGraph(executor)
+		if err != nil {
+			t.Fatalf("build graph %s: %v", f, err)
+		}
+		if err := g.Validate(); err != nil {
+			t.Fatalf("validate %s: %v", f, err)
+		}
 	}
 }

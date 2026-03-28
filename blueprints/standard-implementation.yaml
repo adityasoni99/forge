@@ -1,0 +1,54 @@
+name: standard-implementation
+version: "0.1"
+description: "Standard implementation: plan, implement, lint, test, commit"
+start: plan
+nodes:
+  plan:
+    type: agentic
+    config:
+      prompt: "Analyze the task and create a detailed implementation plan"
+  implement:
+    type: agentic
+    config:
+      prompt: "Implement the plan. Write clean, tested code."
+  lint:
+    type: deterministic
+    config:
+      command: "make lint"
+  lint_gate:
+    type: gate
+    config:
+      check_node: lint
+  test:
+    type: deterministic
+    config:
+      command: "make test"
+  test_gate:
+    type: gate
+    config:
+      check_node: test
+  commit:
+    type: deterministic
+    config:
+      command: "git add -A && git commit -m 'feat: implement task'"
+edges:
+  - from: plan
+    to: implement
+  - from: implement
+    to: lint
+  - from: lint
+    to: lint_gate
+  - from: lint_gate
+    to: test
+    condition: pass
+  - from: lint_gate
+    to: implement
+    condition: fail
+  - from: test
+    to: test_gate
+  - from: test_gate
+    to: commit
+    condition: pass
+  - from: test_gate
+    to: implement
+    condition: fail

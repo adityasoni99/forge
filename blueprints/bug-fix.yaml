@@ -1,0 +1,38 @@
+name: bug-fix
+version: "0.1"
+description: "Bug fix: reproduce, fix, test, commit"
+start: reproduce
+nodes:
+  reproduce:
+    type: agentic
+    config:
+      prompt: "Write a failing test that reproduces the bug"
+  fix:
+    type: agentic
+    config:
+      prompt: "Fix the bug. The reproducing test must pass."
+  test:
+    type: deterministic
+    config:
+      command: "make test"
+  test_gate:
+    type: gate
+    config:
+      check_node: test
+  commit:
+    type: deterministic
+    config:
+      command: "git add -A && git commit -m 'fix: resolve bug'"
+edges:
+  - from: reproduce
+    to: fix
+  - from: fix
+    to: test
+  - from: test
+    to: test_gate
+  - from: test_gate
+    to: commit
+    condition: pass
+  - from: test_gate
+    to: fix
+    condition: fail
