@@ -69,6 +69,181 @@ func TestParseBlueprintYAMLInvalid(t *testing.T) {
 	}
 }
 
+func TestParseBlueprintYAMLMissingName(t *testing.T) {
+	yamlData := `
+version: "0.1"
+start: a
+nodes:
+  a:
+    type: deterministic
+    config:
+      command: "echo"
+edges: []
+`
+	_, err := ParseBlueprintYAML([]byte(yamlData))
+	if err == nil {
+		t.Fatal("expected error for missing name")
+	}
+}
+
+func TestParseBlueprintYAMLMissingStart(t *testing.T) {
+	yamlData := `
+name: no-start
+version: "0.1"
+nodes:
+  a:
+    type: deterministic
+    config:
+      command: "echo"
+edges: []
+`
+	_, err := ParseBlueprintYAML([]byte(yamlData))
+	if err == nil {
+		t.Fatal("expected error for missing start")
+	}
+}
+
+func TestParseBlueprintYAMLNoNodes(t *testing.T) {
+	yamlData := `
+name: empty
+version: "0.1"
+start: nowhere
+nodes: {}
+edges: []
+`
+	_, err := ParseBlueprintYAML([]byte(yamlData))
+	if err == nil {
+		t.Fatal("expected error when blueprint has no nodes")
+	}
+}
+
+func TestBuildGraphDeterministicMissingCommand(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: x
+nodes:
+  x:
+    type: deterministic
+    config: {}
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for deterministic node without command")
+	}
+}
+
+func TestBuildGraphGateMissingCheckNode(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: g
+nodes:
+  g:
+    type: gate
+    config: {}
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for gate node without check_node")
+	}
+}
+
+func TestBuildGraphStartNodeNotInBlueprint(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: missing
+nodes:
+  a:
+    type: deterministic
+    config:
+      command: "echo"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error when start is not a defined node")
+	}
+}
+
+func TestBuildGraphEdgeTargetMissing(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: a
+nodes:
+  a:
+    type: deterministic
+    config:
+      command: "echo"
+edges:
+  - from: a
+    to: ghost
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error when edge references unknown target node")
+	}
+}
+
+func TestBuildGraphEdgeSourceMissing(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: a
+nodes:
+  a:
+    type: deterministic
+    config:
+      command: "echo"
+edges:
+  - from: ghost
+    to: a
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error when edge references unknown source node")
+	}
+}
+
+func TestBlueprintYAMLAddNodesDuplicateID(t *testing.T) {
+	bp := &BlueprintYAML{
+		Nodes: map[string]NodeYAML{
+			"x": {Type: "deterministic", Config: map[string]interface{}{"command": "echo"}},
+		},
+	}
+	g := NewGraph()
+	if err := g.AddNode(&stubNode{id: "x"}); err != nil {
+		t.Fatalf("AddNode: %v", err)
+	}
+	if err := bp.addNodesToGraph(g, &mockExecutor{}); err == nil {
+		t.Fatal("expected error when graph already contains node id from blueprint")
+	}
+}
+
 func TestBuildGraph(t *testing.T) {
 	bp, _ := ParseBlueprintYAML([]byte(testYAML))
 	executor := &mockExecutor{output: "done"}

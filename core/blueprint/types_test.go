@@ -16,6 +16,9 @@ func TestNodeTypeString(t *testing.T) {
 			t.Errorf("NodeType(%d).String() = %q, want %q", tt.nt, got, tt.want)
 		}
 	}
+	if got := NodeType(99).String(); got != "unknown" {
+		t.Errorf("NodeType(99).String() = %q, want %q", got, "unknown")
+	}
 }
 
 func TestNodeStatusString(t *testing.T) {
@@ -33,6 +36,9 @@ func TestNodeStatusString(t *testing.T) {
 		if got := tt.ns.String(); got != tt.want {
 			t.Errorf("NodeStatus(%d).String() = %q, want %q", tt.ns, got, tt.want)
 		}
+	}
+	if got := NodeStatus(99).String(); got != "unknown" {
+		t.Errorf("NodeStatus(99).String() = %q, want %q", got, "unknown")
 	}
 }
 

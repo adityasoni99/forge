@@ -79,9 +79,6 @@ func (g *Graph) Validate() error {
 	if _, ok := g.nodes[g.startNode]; !ok {
 		return fmt.Errorf("start node %q not in graph", g.startNode)
 	}
-	if len(g.nodes) == 0 {
-		return fmt.Errorf("graph has no nodes")
-	}
 	visited := make(map[string]bool)
 	g.dfs(g.startNode, visited)
 	for id := range g.nodes {

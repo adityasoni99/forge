@@ -21,7 +21,7 @@ Layer 1 (Core) orchestrates, Layer 2 (Harness) adds intelligence, Layer 3 (Facto
 
 | Module | Language | Status | Depends On |
 |--------|----------|--------|------------|
-| core/blueprint | Go | In Progress | (none) |
+| core/blueprint | Go | Complete | (none) |
 | harness/ | TypeScript | Planned | core/blueprint via gRPC |
 | factory/ | Go | Planned | core/blueprint, harness via gRPC |
 | cmd/forge | Go | In Progress | core/blueprint |

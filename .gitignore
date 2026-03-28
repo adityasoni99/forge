@@ -1,2 +1,5 @@
 # Built CLI binary at repo root (go build -o forge ./cmd/forge/)
 /forge
+
+# Go coverage output
+coverage.out

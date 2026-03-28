@@ -120,6 +120,25 @@ func TestGraphValidateNoStartNode(t *testing.T) {
 	}
 }
 
+func TestGraphSetStartNodeMissing(t *testing.T) {
+	g := NewGraph()
+	_ = g.AddNode(&stubNode{id: "a"})
+	if err := g.SetStartNode("ghost"); err == nil {
+		t.Fatal("expected error when start node id is not in graph")
+	}
+}
+
+// Corrupt start reference exercises Validate's start-not-in-graph branch.
+// Normal API cannot produce this state (SetStartNode checks membership).
+func TestGraphValidateStartNotInNodes(t *testing.T) {
+	g := NewGraph()
+	_ = g.AddNode(&stubNode{id: "a"})
+	g.startNode = "missing"
+	if err := g.Validate(); err == nil {
+		t.Fatal("expected error when start id is not in nodes map")
+	}
+}
+
 func TestGraphValidateUnreachableNode(t *testing.T) {
 	g := NewGraph()
 	_ = g.AddNode(&stubNode{id: "a"})

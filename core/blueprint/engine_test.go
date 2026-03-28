@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -102,5 +103,55 @@ func TestEngineInvalidGraph(t *testing.T) {
 	_, err := engine.Execute(context.Background())
 	if err == nil {
 		t.Fatal("expected invalid graph error")
+	}
+}
+
+// errorExecuteNode returns a non-nil error from Execute (unlike normal nodes).
+type errorExecuteNode struct{ id string }
+
+func (n *errorExecuteNode) ID() string     { return n.id }
+func (n *errorExecuteNode) Type() NodeType { return NodeTypeDeterministic }
+
+func (n *errorExecuteNode) Execute(context.Context, *RunState) (NodeResult, error) {
+	return NodeResult{}, fmt.Errorf("execute failed")
+}
+
+func TestEngineNodeExecuteReturnsError(t *testing.T) {
+	g := NewGraph()
+	_ = g.AddNode(&errorExecuteNode{id: "bad"})
+	_ = g.SetStartNode("bad")
+	_, err := NewEngine(g).Execute(context.Background())
+	if err == nil {
+		t.Fatal("expected error when node Execute returns non-nil error")
+	}
+}
+
+// Invalid adjacency: next id is not in nodes map; exercises GetNode miss in Execute.
+func TestEngineNextNodeNotInGraph(t *testing.T) {
+	g := NewGraph()
+	_ = g.AddNode(&stubNode{id: "a"})
+	_ = g.SetStartNode("a")
+	g.adjacency["a"] = []Edge{{From: "a", To: "ghost", Condition: ""}}
+	_, err := NewEngine(g).Execute(context.Background())
+	if err == nil {
+		t.Fatal("expected error when current node id is missing from graph")
+	}
+}
+
+func TestEngineGateNoOutgoingEdges(t *testing.T) {
+	g := NewGraph()
+	_ = g.AddNode(&stubNode{id: "prep"})
+	_ = g.AddNode(NewGateNode("g", "prep"))
+	_ = g.AddEdge(Edge{From: "prep", To: "g"})
+	_ = g.SetStartNode("prep")
+	state, err := NewEngine(g).Execute(context.Background())
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if state.Status != NodeStatusPassed {
+		t.Errorf("Status = %v, want Passed", state.Status)
+	}
+	if _, ok := state.NodeResults["g"]; !ok {
+		t.Error("expected gate node result recorded")
 	}
 }

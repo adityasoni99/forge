@@ -45,14 +45,8 @@ func ParseBlueprintYAML(data []byte) (*BlueprintYAML, error) {
 
 func (bp *BlueprintYAML) BuildGraph(executor AgentExecutor) (*Graph, error) {
 	g := NewGraph()
-	for id, ny := range bp.Nodes {
-		node, err := buildNode(id, ny, executor)
-		if err != nil {
-			return nil, fmt.Errorf("node %q: %w", id, err)
-		}
-		if err := g.AddNode(node); err != nil {
-			return nil, err
-		}
+	if err := bp.addNodesToGraph(g, executor); err != nil {
+		return nil, err
 	}
 	for _, ey := range bp.Edges {
 		if err := g.AddEdge(Edge{From: ey.From, To: ey.To, Condition: ey.Condition}); err != nil {
@@ -63,6 +57,19 @@ func (bp *BlueprintYAML) BuildGraph(executor AgentExecutor) (*Graph, error) {
 		return nil, err
 	}
 	return g, nil
+}
+
+func (bp *BlueprintYAML) addNodesToGraph(g *Graph, executor AgentExecutor) error {
+	for id, ny := range bp.Nodes {
+		node, err := buildNode(id, ny, executor)
+		if err != nil {
+			return fmt.Errorf("node %q: %w", id, err)
+		}
+		if err := g.AddNode(node); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
