@@ -76,6 +76,9 @@ func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
 	switch ny.Type {
 	case "agentic":
 		prompt, _ := ny.Config["prompt"].(string)
+		if prompt == "" {
+			return nil, fmt.Errorf("agentic node missing 'prompt' in config")
+		}
 		return NewAgenticNode(id, prompt, ny.Config, executor), nil
 	case "deterministic":
 		command, _ := ny.Config["command"].(string)

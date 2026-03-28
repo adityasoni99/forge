@@ -33,7 +33,6 @@ const (
 	NodeStatusRunning
 	NodeStatusPassed
 	NodeStatusFailed
-	NodeStatusSkipped
 )
 
 func (ns NodeStatus) String() string {
@@ -46,8 +45,6 @@ func (ns NodeStatus) String() string {
 		return "passed"
 	case NodeStatusFailed:
 		return "failed"
-	case NodeStatusSkipped:
-		return "skipped"
 	default:
 		return "unknown"
 	}

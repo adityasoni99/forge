@@ -117,6 +117,42 @@ edges: []
 	}
 }
 
+func TestBuildGraphAgenticMissingOrEmptyPrompt(t *testing.T) {
+	cases := []string{
+		`
+name: t
+version: "0.1"
+start: x
+nodes:
+  x:
+    type: agentic
+    config: {}
+edges: []
+`,
+		`
+name: t
+version: "0.1"
+start: x
+nodes:
+  x:
+    type: agentic
+    config:
+      prompt: ""
+edges: []
+`,
+	}
+	for i, yamlData := range cases {
+		bp, err := ParseBlueprintYAML([]byte(yamlData))
+		if err != nil {
+			t.Fatalf("case %d parse: %v", i, err)
+		}
+		_, err = bp.BuildGraph(&mockExecutor{})
+		if err == nil {
+			t.Fatalf("case %d: expected error for agentic node without prompt", i)
+		}
+	}
+}
+
 func TestBuildGraphDeterministicMissingCommand(t *testing.T) {
 	yamlData := `
 name: t

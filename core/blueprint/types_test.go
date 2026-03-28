@@ -30,7 +30,6 @@ func TestNodeStatusString(t *testing.T) {
 		{NodeStatusRunning, "running"},
 		{NodeStatusPassed, "passed"},
 		{NodeStatusFailed, "failed"},
-		{NodeStatusSkipped, "skipped"},
 	}
 	for _, tt := range tests {
 		if got := tt.ns.String(); got != tt.want {
