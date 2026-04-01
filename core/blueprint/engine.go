@@ -8,23 +8,36 @@ import (
 
 const DefaultMaxIterations = 100
 
+// DefaultMaxConcurrency caps concurrent node goroutines when multiple next nodes are safe.
+const DefaultMaxConcurrency = 10
+
 type Engine struct {
-	graph         *Graph
-	blueprintName string
-	maxIterations int
-	hooks         []EngineHook
+	graph          *Graph
+	blueprintName  string
+	maxIterations  int
+	maxConcurrency int
+	hooks          []EngineHook
 }
 
 func NewEngine(g *Graph, blueprintName string) *Engine {
 	return &Engine{
-		graph:         g,
-		blueprintName: blueprintName,
-		maxIterations: DefaultMaxIterations,
+		graph:          g,
+		blueprintName:  blueprintName,
+		maxIterations:  DefaultMaxIterations,
+		maxConcurrency: DefaultMaxConcurrency,
 	}
 }
 
 func (e *Engine) SetMaxIterations(n int) {
 	e.maxIterations = n
+}
+
+// SetMaxConcurrency sets the errgroup limit for parallel node execution (minimum 1).
+func (e *Engine) SetMaxConcurrency(n int) {
+	if n < 1 {
+		n = 1
+	}
+	e.maxConcurrency = n
 }
 
 func (e *Engine) RegisterHook(hook EngineHook) {
@@ -85,68 +98,51 @@ func (e *Engine) Execute(ctx context.Context) (*RunState, error) {
 		}
 		iterations++
 
-		node, ok := e.graph.GetNode(state.CurrentNode)
+		nodeID := state.CurrentNode
+		node, ok := e.graph.GetNode(nodeID)
 		if !ok {
-			nfErr := fmt.Errorf("node %q not found", state.CurrentNode)
+			nfErr := fmt.Errorf("node %q not found", nodeID)
 			_ = e.fireHooks(ctx, HookRunError, HookData{
-				NodeID:   state.CurrentNode,
+				NodeID:   nodeID,
 				RunState: state,
 				Error:    nfErr,
 			})
 			return e.failRun(state, nfErr)
 		}
 
-		if err := e.fireHooks(ctx, HookPreNodeExec, HookData{
-			NodeID:   state.CurrentNode,
-			NodeType: node.Type(),
-			RunState: state,
-		}); err != nil {
-			return e.failRun(state, err)
-		}
-
-		result, err := node.Execute(ctx, state)
+		result, err := e.runNodeWithHooks(ctx, state, nodeID, node)
 		if err != nil {
+			return e.failRun(state, err)
+		}
+
+		state.NodeResults[nodeID] = result
+
+		next := e.resolveNextNodes(nodeID, node, result)
+		if len(next) == 0 {
+			state.CurrentNode = ""
+			continue
+		}
+		if len(next) == 1 || !e.allConcurrencySafe(next) {
+			state.CurrentNode = next[0]
+			continue
+		}
+
+		if iterations+len(next) > e.maxIterations {
+			loopErr := fmt.Errorf("exceeded max iterations (%d)", e.maxIterations)
 			_ = e.fireHooks(ctx, HookRunError, HookData{
-				NodeID:   state.CurrentNode,
-				NodeType: node.Type(),
+				NodeID:   nodeID,
 				RunState: state,
-				Error:    err,
+				Error:    loopErr,
 			})
-			return e.failRun(state, fmt.Errorf("node %q error: %w", state.CurrentNode, err))
+			return e.failRun(state, loopErr)
 		}
+		iterations += len(next)
 
-		resCopy := result
-		if err := e.fireHooks(ctx, HookPostNodeExec, HookData{
-			NodeID:   state.CurrentNode,
-			NodeType: node.Type(),
-			RunState: state,
-			Result:   &resCopy,
-		}); err != nil {
+		merged, err := e.runParallelFanOut(ctx, state, next)
+		if err != nil {
 			return e.failRun(state, err)
 		}
-
-		if node.Type() == NodeTypeGate {
-			if err := e.fireHooks(ctx, HookGateEvaluated, HookData{
-				NodeID:   state.CurrentNode,
-				NodeType: node.Type(),
-				RunState: state,
-				Result:   &resCopy,
-			}); err != nil {
-				return e.failRun(state, err)
-			}
-		}
-
-		if err := e.fireHooks(ctx, HookPreEdgeTraversal, HookData{
-			NodeID:   state.CurrentNode,
-			NodeType: node.Type(),
-			RunState: state,
-			Result:   &resCopy,
-		}); err != nil {
-			return e.failRun(state, err)
-		}
-
-		state.NodeResults[state.CurrentNode] = result
-		state.CurrentNode = e.resolveNextNode(state.CurrentNode, node, result)
+		state.CurrentNode = merged
 	}
 
 	state.Status = NodeStatusPassed
@@ -157,21 +153,76 @@ func (e *Engine) Execute(ctx context.Context) (*RunState, error) {
 	return state, nil
 }
 
-func (e *Engine) resolveNextNode(currentID string, node Node, result NodeResult) string {
+func (e *Engine) resolveNextNodes(currentID string, node Node, result NodeResult) []string {
 	if node.Type() == NodeTypeGate {
 		condition := "pass"
 		if result.Status == NodeStatusFailed {
 			condition = "fail"
 		}
-		next := e.graph.NextNodes(currentID, condition)
-		if len(next) > 0 {
-			return next[0]
+		return e.graph.NextNodes(currentID, condition)
+	}
+	return e.graph.NextNodes(currentID, "")
+}
+
+func (e *Engine) allConcurrencySafe(ids []string) bool {
+	for _, id := range ids {
+		n, ok := e.graph.GetNode(id)
+		if !ok || !n.IsConcurrencySafe() {
+			return false
 		}
-		return ""
 	}
-	next := e.graph.NextNodes(currentID, "")
-	if len(next) > 0 {
-		return next[0]
+	return true
+}
+
+func (e *Engine) runNodeWithHooks(ctx context.Context, state *RunState, nodeID string, node Node) (NodeResult, error) {
+	if err := e.fireHooks(ctx, HookPreNodeExec, HookData{
+		NodeID:   nodeID,
+		NodeType: node.Type(),
+		RunState: state,
+	}); err != nil {
+		return NodeResult{}, err
 	}
-	return ""
+
+	result, err := node.Execute(ctx, state)
+	if err != nil {
+		_ = e.fireHooks(ctx, HookRunError, HookData{
+			NodeID:   nodeID,
+			NodeType: node.Type(),
+			RunState: state,
+			Error:    err,
+		})
+		return NodeResult{}, fmt.Errorf("node %q error: %w", nodeID, err)
+	}
+
+	resCopy := result
+	if err := e.fireHooks(ctx, HookPostNodeExec, HookData{
+		NodeID:   nodeID,
+		NodeType: node.Type(),
+		RunState: state,
+		Result:   &resCopy,
+	}); err != nil {
+		return NodeResult{}, err
+	}
+
+	if node.Type() == NodeTypeGate {
+		if err := e.fireHooks(ctx, HookGateEvaluated, HookData{
+			NodeID:   nodeID,
+			NodeType: node.Type(),
+			RunState: state,
+			Result:   &resCopy,
+		}); err != nil {
+			return NodeResult{}, err
+		}
+	}
+
+	if err := e.fireHooks(ctx, HookPreEdgeTraversal, HookData{
+		NodeID:   nodeID,
+		NodeType: node.Type(),
+		RunState: state,
+		Result:   &resCopy,
+	}); err != nil {
+		return NodeResult{}, err
+	}
+
+	return result, nil
 }

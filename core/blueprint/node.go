@@ -21,6 +21,8 @@ func NewDeterministicNode(id, command string) *DeterministicNode {
 func (n *DeterministicNode) ID() string     { return n.id }
 func (n *DeterministicNode) Type() NodeType { return NodeTypeDeterministic }
 
+func (n *DeterministicNode) IsConcurrencySafe() bool { return true }
+
 func (n *DeterministicNode) Execute(ctx context.Context, _ *RunState) (NodeResult, error) {
 	cmd := exec.CommandContext(ctx, "sh", "-c", n.command)
 	output, err := cmd.CombinedOutput()
@@ -49,6 +51,8 @@ func NewGateNode(id, checkNodeID string) *GateNode {
 func (n *GateNode) ID() string     { return n.id }
 func (n *GateNode) Type() NodeType { return NodeTypeGate }
 
+func (n *GateNode) IsConcurrencySafe() bool { return false }
+
 func (n *GateNode) Execute(_ context.Context, state *RunState) (NodeResult, error) {
 	prev, ok := state.NodeResults[n.checkNodeID]
 	if !ok {
@@ -64,18 +68,28 @@ func (n *GateNode) Execute(_ context.Context, state *RunState) (NodeResult, erro
 }
 
 type AgenticNode struct {
-	id       string
-	prompt   string
-	config   map[string]interface{}
-	executor AgentExecutor
+	id              string
+	prompt          string
+	config          map[string]interface{}
+	executor        AgentExecutor
+	concurrencySafe bool
 }
 
 func NewAgenticNode(id, prompt string, config map[string]interface{}, executor AgentExecutor) *AgenticNode {
 	return &AgenticNode{id: id, prompt: prompt, config: config, executor: executor}
 }
 
+// SetConcurrencySafe marks whether this node may run in parallel with other nodes.
+// Default is false (order-dependent or shared state).
+func (n *AgenticNode) SetConcurrencySafe(safe bool) *AgenticNode {
+	n.concurrencySafe = safe
+	return n
+}
+
 func (n *AgenticNode) ID() string     { return n.id }
 func (n *AgenticNode) Type() NodeType { return NodeTypeAgentic }
+
+func (n *AgenticNode) IsConcurrencySafe() bool { return n.concurrencySafe }
 
 func (n *AgenticNode) Execute(ctx context.Context, _ *RunState) (NodeResult, error) {
 	output, err := n.executor.Execute(ctx, n.prompt, n.config)

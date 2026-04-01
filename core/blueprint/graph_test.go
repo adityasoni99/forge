@@ -17,6 +17,8 @@ func (s *stubNode) Execute(_ context.Context, _ *RunState) (NodeResult, error) {
 	return NodeResult{Status: NodeStatusPassed}, nil
 }
 
+func (s *stubNode) IsConcurrencySafe() bool { return false }
+
 func TestGraphAddNode(t *testing.T) {
 	g := NewGraph()
 	err := g.AddNode(&stubNode{id: "n1", nodeType: NodeTypeAgentic})

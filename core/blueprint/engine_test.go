@@ -128,6 +128,8 @@ func (n *errorExecuteNode) Execute(context.Context, *RunState) (NodeResult, erro
 	return NodeResult{}, fmt.Errorf("execute failed")
 }
 
+func (n *errorExecuteNode) IsConcurrencySafe() bool { return false }
+
 func TestEngineNodeExecuteReturnsError(t *testing.T) {
 	g := NewGraph()
 	_ = g.AddNode(&errorExecuteNode{id: "bad"})

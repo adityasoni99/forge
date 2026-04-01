@@ -60,6 +60,7 @@ type Node interface {
 	ID() string
 	Type() NodeType
 	Execute(ctx context.Context, state *RunState) (NodeResult, error)
+	IsConcurrencySafe() bool
 }
 
 type Edge struct {
