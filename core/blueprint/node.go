@@ -10,8 +10,10 @@ import (
 // DeterministicNode runs blueprint-supplied commands via sh -c. Only use blueprint
 // YAML from trusted sources; untrusted input can execute arbitrary shell commands.
 type DeterministicNode struct {
-	id      string
-	command string
+	id          string
+	command     string
+	description string // YAML metadata; does not affect execution
+	maxRetries  int    // YAML metadata; does not affect execution yet
 }
 
 func NewDeterministicNode(id, command string) *DeterministicNode {
@@ -42,6 +44,8 @@ func (n *DeterministicNode) Execute(ctx context.Context, _ *RunState) (NodeResul
 type GateNode struct {
 	id          string
 	checkNodeID string
+	description string // YAML metadata; does not affect execution
+	maxRetries  int    // YAML metadata; does not affect execution yet
 }
 
 func NewGateNode(id, checkNodeID string) *GateNode {

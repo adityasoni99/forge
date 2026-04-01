@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -352,5 +353,192 @@ func TestBuiltinBlueprintsValid(t *testing.T) {
 		if err := g.Validate(); err != nil {
 			t.Fatalf("validate %s: %v", f, err)
 		}
+	}
+}
+
+const enrichedYAML = `
+name: enriched
+version: "1.0"
+description: "desc"
+when_to_use: "When refactoring services"
+start: a
+hooks:
+  - event: pre_node_exec
+    action: log
+    config:
+      level: debug
+nodes:
+  a:
+    type: agentic
+    description: "Planning step"
+    concurrency_safe: true
+    allowed_tools:
+      - read
+      - grep
+    max_retries: 3
+    config:
+      prompt: "Plan the work"
+  b:
+    type: deterministic
+    description: "Run checks"
+    max_retries: 1
+    config:
+      command: "echo ok"
+edges:
+  - from: a
+    to: b
+`
+
+func TestParseEnrichedBlueprintYAML(t *testing.T) {
+	bp, err := ParseBlueprintYAML([]byte(enrichedYAML))
+	if err != nil {
+		t.Fatalf("ParseBlueprintYAML: %v", err)
+	}
+	if bp.WhenToUse != "When refactoring services" {
+		t.Errorf("WhenToUse = %q", bp.WhenToUse)
+	}
+	if len(bp.Hooks) != 1 {
+		t.Fatalf("Hooks len = %d, want 1", len(bp.Hooks))
+	}
+	h := bp.Hooks[0]
+	if h.Event != "pre_node_exec" || h.Action != "log" {
+		t.Errorf("Hook = %+v", h)
+	}
+	if h.Config["level"] != "debug" {
+		t.Errorf("Hook.Config = %#v", h.Config)
+	}
+	na := bp.Nodes["a"]
+	if na.Description != "Planning step" {
+		t.Errorf("node a Description = %q", na.Description)
+	}
+	if na.ConcurrencySafe == nil || !*na.ConcurrencySafe {
+		t.Errorf("node a ConcurrencySafe = %v", na.ConcurrencySafe)
+	}
+	wantTools := []string{"read", "grep"}
+	if !reflect.DeepEqual(na.AllowedTools, wantTools) {
+		t.Errorf("AllowedTools = %v, want %v", na.AllowedTools, wantTools)
+	}
+	if na.MaxRetries != 3 {
+		t.Errorf("MaxRetries = %d", na.MaxRetries)
+	}
+	nb := bp.Nodes["b"]
+	if nb.Description != "Run checks" {
+		t.Errorf("node b Description = %q", nb.Description)
+	}
+	if nb.MaxRetries != 1 {
+		t.Errorf("node b MaxRetries = %d", nb.MaxRetries)
+	}
+}
+
+func TestBuildGraphConcurrencySafeFromYAML(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: x
+nodes:
+  x:
+    type: agentic
+    concurrency_safe: true
+    config:
+      prompt: "hi"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	raw, _ := g.GetNode("x")
+	an, ok := raw.(*AgenticNode)
+	if !ok {
+		t.Fatalf("node type %T", raw)
+	}
+	if !an.IsConcurrencySafe() {
+		t.Error("IsConcurrencySafe() = false, want true")
+	}
+}
+
+func TestBuildGraphAllowedToolsOnDeterministicErrors(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: x
+nodes:
+  x:
+    type: deterministic
+    allowed_tools:
+      - shell
+    config:
+      command: "echo"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for allowed_tools on deterministic node")
+	}
+}
+
+func TestBackwardCompatibility(t *testing.T) {
+	bp, err := ParseBlueprintYAML([]byte(testYAML))
+	if err != nil {
+		t.Fatalf("ParseBlueprintYAML: %v", err)
+	}
+	if bp.WhenToUse != "" {
+		t.Errorf("WhenToUse = %q, want empty", bp.WhenToUse)
+	}
+	if len(bp.Hooks) != 0 {
+		t.Errorf("Hooks = %v, want empty", bp.Hooks)
+	}
+	plan := bp.Nodes["plan"]
+	if plan.Description != "" || plan.ConcurrencySafe != nil || len(plan.AllowedTools) != 0 || plan.MaxRetries != 0 {
+		t.Errorf("plan node has unexpected enriched fields: %+v", plan)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{output: "done"})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	if g.NodeCount() != 4 {
+		t.Errorf("NodeCount = %d", g.NodeCount())
+	}
+}
+
+func TestBuildGraphAllowedToolsOnAgentic(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: x
+nodes:
+  x:
+    type: agentic
+    allowed_tools:
+      - read
+      - write
+    config:
+      prompt: "go"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	raw, _ := g.GetNode("x")
+	an := raw.(*AgenticNode)
+	tools, ok := an.config["allowed_tools"].([]string)
+	if !ok {
+		t.Fatalf("allowed_tools type %T", an.config["allowed_tools"])
+	}
+	if !reflect.DeepEqual(tools, []string{"read", "write"}) {
+		t.Errorf("allowed_tools = %v", tools)
 	}
 }

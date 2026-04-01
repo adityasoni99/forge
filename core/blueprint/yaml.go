@@ -10,14 +10,27 @@ type BlueprintYAML struct {
 	Name        string              `yaml:"name"`
 	Version     string              `yaml:"version"`
 	Description string              `yaml:"description"`
+	WhenToUse   string              `yaml:"when_to_use,omitempty"`
 	Start       string              `yaml:"start"`
+	Hooks       []HookYAML          `yaml:"hooks,omitempty"`
 	Nodes       map[string]NodeYAML `yaml:"nodes"`
 	Edges       []EdgeYAML          `yaml:"edges"`
 }
 
+// HookYAML declares a blueprint-level hook (parsed for documentation and future wiring).
+type HookYAML struct {
+	Event  string                 `yaml:"event"`
+	Action string                 `yaml:"action"`
+	Config map[string]interface{} `yaml:"config,omitempty"`
+}
+
 type NodeYAML struct {
-	Type   string                 `yaml:"type"`
-	Config map[string]interface{} `yaml:"config"`
+	Type            string                 `yaml:"type"`
+	Description     string                 `yaml:"description,omitempty"`
+	ConcurrencySafe *bool                  `yaml:"concurrency_safe,omitempty"`
+	AllowedTools    []string               `yaml:"allowed_tools,omitempty"`
+	MaxRetries      int                    `yaml:"max_retries,omitempty"`
+	Config          map[string]interface{} `yaml:"config"`
 }
 
 type EdgeYAML struct {
@@ -61,6 +74,9 @@ func (bp *BlueprintYAML) BuildGraph(executor AgentExecutor) (*Graph, error) {
 
 func (bp *BlueprintYAML) addNodesToGraph(g *Graph, executor AgentExecutor) error {
 	for id, ny := range bp.Nodes {
+		if err := validateNodeYAML(id, ny); err != nil {
+			return err
+		}
 		node, err := buildNode(id, ny, executor)
 		if err != nil {
 			return fmt.Errorf("node %q: %w", id, err)
@@ -72,6 +88,26 @@ func (bp *BlueprintYAML) addNodesToGraph(g *Graph, executor AgentExecutor) error
 	return nil
 }
 
+func validateNodeYAML(nodeID string, ny NodeYAML) error {
+	if len(ny.AllowedTools) > 0 && ny.Type != "agentic" {
+		return fmt.Errorf("node %q: allowed_tools is only valid for agentic nodes", nodeID)
+	}
+	// concurrency_safe on non-agentic nodes is ignored; deterministic and gate use
+	// code-level IsConcurrencySafe() semantics.
+	return nil
+}
+
+func cloneConfig(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return make(map[string]interface{})
+	}
+	dst := make(map[string]interface{}, len(src)+4)
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
 func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
 	switch ny.Type {
 	case "agentic":
@@ -79,19 +115,41 @@ func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
 		if prompt == "" {
 			return nil, fmt.Errorf("agentic node missing 'prompt' in config")
 		}
-		return NewAgenticNode(id, prompt, ny.Config, executor), nil
+		cfg := cloneConfig(ny.Config)
+		if len(ny.AllowedTools) > 0 {
+			tools := make([]string, len(ny.AllowedTools))
+			copy(tools, ny.AllowedTools)
+			cfg["allowed_tools"] = tools
+		}
+		if ny.Description != "" {
+			cfg["node_description"] = ny.Description
+		}
+		if ny.MaxRetries != 0 {
+			cfg["max_retries"] = ny.MaxRetries
+		}
+		n := NewAgenticNode(id, prompt, cfg, executor)
+		if ny.ConcurrencySafe != nil {
+			n.SetConcurrencySafe(*ny.ConcurrencySafe)
+		}
+		return n, nil
 	case "deterministic":
 		command, _ := ny.Config["command"].(string)
 		if command == "" {
 			return nil, fmt.Errorf("deterministic node missing 'command' in config")
 		}
-		return NewDeterministicNode(id, command), nil
+		n := NewDeterministicNode(id, command)
+		n.description = ny.Description
+		n.maxRetries = ny.MaxRetries
+		return n, nil
 	case "gate":
 		checkNode, _ := ny.Config["check_node"].(string)
 		if checkNode == "" {
 			return nil, fmt.Errorf("gate node missing 'check_node' in config")
 		}
-		return NewGateNode(id, checkNode), nil
+		n := NewGateNode(id, checkNode)
+		n.description = ny.Description
+		n.maxRetries = ny.MaxRetries
+		return n, nil
 	default:
 		return nil, fmt.Errorf("unknown node type: %q", ny.Type)
 	}
