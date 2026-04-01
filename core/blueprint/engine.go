@@ -12,11 +12,13 @@ const DefaultMaxIterations = 100
 const DefaultMaxConcurrency = 10
 
 type Engine struct {
-	graph          *Graph
-	blueprintName  string
-	maxIterations  int
-	maxConcurrency int
-	hooks          []EngineHook
+	graph             *Graph
+	blueprintName     string
+	maxIterations     int
+	maxConcurrency    int
+	hooks             []EngineHook
+	permissionChecker PermissionChecker // nil means allow-all
+	headless          bool              // when true, PermissionAsk is treated as deny
 }
 
 func NewEngine(g *Graph, blueprintName string) *Engine {
@@ -42,6 +44,40 @@ func (e *Engine) SetMaxConcurrency(n int) {
 
 func (e *Engine) RegisterHook(hook EngineHook) {
 	e.hooks = append(e.hooks, hook)
+}
+
+// SetPermissionChecker sets the checker run before each node executes. Nil allows all nodes.
+func (e *Engine) SetPermissionChecker(pc PermissionChecker) {
+	e.permissionChecker = pc
+}
+
+// SetHeadless configures whether PermissionAsk is denied (true) or allowed pending future UI (false).
+func (e *Engine) SetHeadless(v bool) {
+	e.headless = v
+}
+
+func (e *Engine) checkPermission(ctx context.Context, node Node, state *RunState) error {
+	if e.permissionChecker == nil {
+		return nil
+	}
+	decision, err := e.permissionChecker.Check(ctx, node, state)
+	if err != nil {
+		return err
+	}
+	nodeID := node.ID()
+	switch decision {
+	case PermissionAllow:
+		return nil
+	case PermissionDeny:
+		return fmt.Errorf("permission denied for node %q", nodeID)
+	case PermissionAsk:
+		if e.headless {
+			return fmt.Errorf("permission denied (headless mode) for node %q", nodeID)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown permission decision for node %q", nodeID)
+	}
 }
 
 func (e *Engine) fireHooks(ctx context.Context, event HookEvent, data HookData) error {
@@ -180,6 +216,10 @@ func (e *Engine) runNodeWithHooks(ctx context.Context, state *RunState, nodeID s
 		NodeType: node.Type(),
 		RunState: state,
 	}); err != nil {
+		return NodeResult{}, err
+	}
+
+	if err := e.checkPermission(ctx, node, state); err != nil {
 		return NodeResult{}, err
 	}
 
