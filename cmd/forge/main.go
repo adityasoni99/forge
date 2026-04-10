@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -9,6 +10,10 @@ import (
 
 	"github.com/aditya-soni/forge/blueprints"
 	"github.com/aditya-soni/forge/core/blueprint"
+	"github.com/aditya-soni/forge/factory/delivery"
+	"github.com/aditya-soni/forge/factory/orchestrator"
+	"github.com/aditya-soni/forge/factory/sandbox"
+	"github.com/aditya-soni/forge/factory/workspace"
 	"github.com/aditya-soni/forge/internal/grpcexec"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -21,6 +26,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "run":
+		cmdForgeRun(os.Args[2:])
 	case "blueprint":
 		handleBlueprint(os.Args[2:])
 	default:
@@ -33,9 +40,66 @@ func main() {
 func printUsage() {
 	fmt.Println("Usage: forge <command>")
 	fmt.Println("Commands:")
+	fmt.Println("  run \"task\" [flags]         Run a task in a Docker sandbox")
 	fmt.Println("  blueprint validate <file>  Validate a blueprint YAML file")
 	fmt.Println("  blueprint list             List built-in blueprints")
 	fmt.Println("  blueprint run [--harness <addr>] <file>  Run blueprint (mock or gRPC harness)")
+}
+
+func cmdForgeRun(args []string) {
+	fs := flag.NewFlagSet("run", flag.ExitOnError)
+	blueprintName := fs.String("blueprint", "standard-implementation", "Blueprint name or file")
+	noSandbox := fs.Bool("no-sandbox", false, "Run without Docker sandbox")
+	noPR := fs.Bool("no-pr", false, "Skip PR creation")
+	adapter := fs.String("adapter", "echo", "Agent adapter (echo, claude)")
+	image := fs.String("image", "forge:latest", "Docker image for sandbox")
+	baseBranch := fs.String("base-branch", "main", "Base branch for PR")
+	fs.Parse(args)
+
+	task := strings.Join(fs.Args(), " ")
+	if task == "" {
+		fmt.Fprintln(os.Stderr, "usage: forge run [flags] \"task description\"")
+		os.Exit(1)
+	}
+
+	if *noSandbox {
+		fmt.Println("Running locally (no sandbox)...")
+		return
+	}
+
+	cwd, _ := os.Getwd()
+	runner := &sandbox.ExecRunner{}
+	pipeline := orchestrator.NewPipeline(
+		sandbox.NewDockerSandbox(runner),
+		workspace.NewManager(),
+		delivery.NewGitDelivery(runner),
+	)
+
+	req := orchestrator.RunRequest{
+		Task:          task,
+		BlueprintName: *blueprintName,
+		RepoDir:       cwd,
+		Adapter:       *adapter,
+		Image:         *image,
+		NoPR:          *noPR,
+		BaseBranch:    *baseBranch,
+	}
+
+	fmt.Printf("Forge run: %q (blueprint=%s, image=%s)\n", task, *blueprintName, *image)
+	result, err := pipeline.Execute(context.Background(), req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "pipeline error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Status: %s (%.1fs)\n", result.Status, result.Duration.Seconds())
+	if result.PRURL != "" {
+		fmt.Printf("PR: %s\n", result.PRURL)
+	}
+	if result.Status == orchestrator.RunStatusFailed {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", result.Error)
+		os.Exit(1)
+	}
 }
 
 func handleBlueprint(args []string) {

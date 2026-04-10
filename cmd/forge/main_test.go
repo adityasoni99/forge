@@ -51,6 +51,17 @@ func TestCLIValidateInvalidFile(t *testing.T) {
 	}
 }
 
+func TestCLIRunNoArgs(t *testing.T) {
+	cmd := forgeCmd(t, "run")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected error for run with no args")
+	}
+	if !strings.Contains(string(out), "usage") {
+		t.Errorf("expected usage message, got: %s", out)
+	}
+}
+
 func TestCLINoArgs(t *testing.T) {
 	cmd := forgeCmd(t)
 	out, err := cmd.CombinedOutput()
