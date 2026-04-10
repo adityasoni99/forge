@@ -3,3 +3,6 @@
 
 # Go coverage output
 coverage.out
+
+# Node.js (harness)
+node_modules/
