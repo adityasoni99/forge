@@ -2,6 +2,8 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +11,24 @@ import (
 	"github.com/aditya-soni/forge/factory/sandbox"
 	"github.com/aditya-soni/forge/factory/workspace"
 )
+
+func TestRunStatusString(t *testing.T) {
+	tests := []struct {
+		status RunStatus
+		want   string
+	}{
+		{RunStatusPending, "pending"},
+		{RunStatusRunning, "running"},
+		{RunStatusPassed, "passed"},
+		{RunStatusFailed, "failed"},
+		{RunStatus(99), "unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.status.String(); got != tt.want {
+			t.Errorf("RunStatus(%d).String() = %q, want %q", tt.status, got, tt.want)
+		}
+	}
+}
 
 type mockSandboxManager struct {
 	ensureCalled bool
@@ -129,5 +149,155 @@ func TestPipelineNoPR(t *testing.T) {
 	}
 	if dlv.delivered {
 		t.Error("delivery should not be called with NoPR=true")
+	}
+}
+
+// --- Failing mock variants for error path coverage ---
+
+type failingWorkspaceManager struct{}
+
+func (m *failingWorkspaceManager) Create(_ context.Context, _, _ string) (*workspace.Workspace, error) {
+	return nil, fmt.Errorf("git worktree add failed")
+}
+
+func (m *failingWorkspaceManager) Destroy(_ context.Context, _ *workspace.Workspace) error {
+	return nil
+}
+
+type failingEnsureImageManager struct{}
+
+func (m *failingEnsureImageManager) EnsureImage(_ context.Context, _ sandbox.SandboxConfig) error {
+	return fmt.Errorf("docker pull failed")
+}
+
+func (m *failingEnsureImageManager) Run(_ context.Context, _ sandbox.SandboxConfig, _ []string) (sandbox.SandboxResult, error) {
+	return sandbox.SandboxResult{}, nil
+}
+
+type failingSandboxRunManager struct{}
+
+func (m *failingSandboxRunManager) EnsureImage(_ context.Context, _ sandbox.SandboxConfig) error {
+	return nil
+}
+
+func (m *failingSandboxRunManager) Run(_ context.Context, _ sandbox.SandboxConfig, _ []string) (sandbox.SandboxResult, error) {
+	return sandbox.SandboxResult{}, fmt.Errorf("docker run error")
+}
+
+type failingDeliveryManager struct{}
+
+func (m *failingDeliveryManager) Deliver(_ context.Context, _, _ string, _ delivery.DeliveryConfig) (delivery.DeliveryResult, error) {
+	return delivery.DeliveryResult{}, fmt.Errorf("git push failed")
+}
+
+// --- Error path tests ---
+
+func TestPipelineWorkspaceCreateFails(t *testing.T) {
+	p := NewPipeline(&mockSandboxManager{}, &failingWorkspaceManager{}, &mockDeliveryManager{})
+	result, err := p.Execute(context.Background(), RunRequest{Task: "test", RepoDir: "/repo", Image: "forge:latest"})
+	if err != nil {
+		t.Fatalf("Execute should not return error: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if !strings.Contains(result.Error, "workspace create") {
+		t.Errorf("Error = %q, want to contain 'workspace create'", result.Error)
+	}
+}
+
+func TestPipelineEnsureImageFails(t *testing.T) {
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: "/tmp/test", Branch: "forge/run-1", RepoDir: "/repo"}}
+	p := NewPipeline(&failingEnsureImageManager{}, ws, &mockDeliveryManager{})
+	result, err := p.Execute(context.Background(), RunRequest{Task: "test", RepoDir: "/repo", Image: "forge:latest"})
+	if err != nil {
+		t.Fatalf("Execute should not return error: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if !ws.destroyed {
+		t.Error("workspace should be cleaned up even on ensure image failure")
+	}
+}
+
+func TestPipelineSandboxRunError(t *testing.T) {
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: "/tmp/test", Branch: "forge/run-1", RepoDir: "/repo"}}
+	p := NewPipeline(&failingSandboxRunManager{}, ws, &mockDeliveryManager{})
+	result, err := p.Execute(context.Background(), RunRequest{Task: "test", RepoDir: "/repo", Image: "forge:latest"})
+	if err != nil {
+		t.Fatalf("Execute should not return error: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if !strings.Contains(result.Error, "sandbox run") {
+		t.Errorf("Error = %q, want to contain 'sandbox run'", result.Error)
+	}
+}
+
+func TestPipelineDeliveryFails(t *testing.T) {
+	sbx := &mockSandboxManager{runResult: sandbox.SandboxResult{ExitCode: 0, Output: "ok"}}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: "/tmp/test", Branch: "forge/run-1", RepoDir: "/repo"}}
+	p := NewPipeline(sbx, ws, &failingDeliveryManager{})
+	result, err := p.Execute(context.Background(), RunRequest{Task: "test", RepoDir: "/repo", Image: "forge:latest"})
+	if err != nil {
+		t.Fatalf("Execute should not return error: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if !strings.Contains(result.Error, "delivery") {
+		t.Errorf("Error = %q, want to contain 'delivery'", result.Error)
+	}
+}
+
+func TestPipelineDefaultImage(t *testing.T) {
+	sbx := &mockSandboxManager{runResult: sandbox.SandboxResult{ExitCode: 0}}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: "/tmp/test", Branch: "forge/run-1", RepoDir: "/repo"}}
+	dlv := &mockDeliveryManager{result: delivery.DeliveryResult{Pushed: true}}
+
+	p := NewPipeline(sbx, ws, dlv)
+	result, err := p.Execute(context.Background(), RunRequest{
+		Task:    "test",
+		RepoDir: "/repo",
+		NoPR:    true,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Status != RunStatusPassed {
+		t.Errorf("Status = %v, want Passed (default image should work)", result.Status)
+	}
+}
+
+func TestBuildSandboxCommandAllFields(t *testing.T) {
+	req := RunRequest{
+		BlueprintName: "bug-fix",
+		BlueprintFile: "/path/to/bp.yaml",
+		Task:          "Fix bug",
+		Adapter:       "claude",
+	}
+	args := buildSandboxCommand(req)
+	if len(args) != 8 {
+		t.Fatalf("expected 8 args, got %d: %v", len(args), args)
+	}
+	expected := []string{
+		"--blueprint", "bug-fix",
+		"--blueprint-file", "/path/to/bp.yaml",
+		"--task", "Fix bug",
+		"--adapter", "claude",
+	}
+	for i, want := range expected {
+		if args[i] != want {
+			t.Errorf("args[%d] = %q, want %q", i, args[i], want)
+		}
+	}
+}
+
+func TestBuildSandboxCommandMinimal(t *testing.T) {
+	args := buildSandboxCommand(RunRequest{})
+	if len(args) != 0 {
+		t.Errorf("expected 0 args for empty request, got %d: %v", len(args), args)
 	}
 }

@@ -57,7 +57,7 @@ depth is in `docs/design.md`.
 | **CLI** | `cmd/forge/` |
 | **Layer 2** — harness, adapters, gRPC server | `harness/` (MVP: echo + Claude adapters, context loader, gRPC server) |
 | **gRPC** — contract + Go client | `proto/forge/v1/`, `internal/grpcexec/` |
-| **Layer 3** (planned) — sandbox, triggers, orchestration, delivery | `factory/` — overview: [docs/design.md](docs/design.md) §6 |
+| **Layer 3** — sandbox, workspace, orchestrator, delivery | `factory/` (MVP complete) |
 | **Daemon** (planned) | `cmd/forged/` |
 | **Built-in skills** (planned) | `skills/` |
 | **Cross-package tests** (planned) | `tests/` (repo-level) |
@@ -70,39 +70,30 @@ depth is in `docs/design.md`.
 ```text
                     +---------------------------+
                     |      cmd/forge (CLI)      |
-                    |  blueprint validate|list |
+                    |  blueprint validate|list  |
                     |  |run [--harness addr]    |
+                    |  run "task" [flags]       |
                     +-------------+-------------+
                                   |
-                    +-------------v-------------+
-                    | core/blueprint            |  Layer 1: Forge Core
-                    | Graph, Nodes, Engine,     |
-                    | YAML, RunState,           |
-                    | AgentExecutor seam        |
-                    +-------------+-------------+
-                                  |
-                    +-------------v-------------+
-                    | internal/grpcexec          |  gRPC bridge
-                    | GrpcAgentExecutor          |
-                    +-------------+--------------+
-                                  |  gRPC
-                    +-------------v--------------+
-                    | harness/ (TypeScript)       |  Layer 2: Forge Harness
-                    | gRPC server, adapters,      |  (MVP complete)
-                    | context loader              |
-                    +-----------------------------+
-                                  ^
-                                  | optional calls
-                    +-------------+-------------+
-                    |   factory/ (Go)           |  Layer 3: Forge Factory
-                    |  sandbox, triggers,       |  (planned; not yet in repo)
-                    |  orchestrator, delivery   |
-                    +-------------+-------------+
-                                  |
-                    +-------------v-------------+
-                    | Docker/Podman, git remote,  |
-                    | Slack/webhook (future)      |
-                    +---------------------------+
+              +-------------------+-------------------+
+              |                                       |
++-------------v-------------+           +-------------v--------------+
+| core/blueprint            |           | factory/orchestrator       |
+| Graph, Nodes, Engine,     |           | Pipeline: workspace ->     |
+| YAML, RunState,           |           | sandbox -> delivery        |
+| AgentExecutor seam        |           +--------+--------+----------+
++-------------+-------------+                    |        |
+              |                    +-------------+  +-----v--------+
++-------------v-------------+     |                 |              |
+| internal/grpcexec          |  factory/workspace  factory/sandbox  factory/delivery
+| GrpcAgentExecutor          |  (git worktree)    (Docker)        (git push + PR)
++-------------+--------------+
+              |  gRPC
++-------------v--------------+
+| harness/ (TypeScript)       |
+| gRPC server, adapters,      |
+| context loader              |
++-----------------------------+
 ```
 
 ---
@@ -116,10 +107,11 @@ depth is in `docs/design.md`.
 | `cmd/forge` | 1 | Go | `core/blueprint`, `blueprints`, optional `internal/grpcexec` | **In progress** (CLI: validate, list, run w/ mock or gRPC harness) |
 | `proto/`, `internal/grpcexec/` | 1–2 | Go | `core/blueprint` | **Complete** (ForgeAgent contract, `GrpcAgentExecutor`) |
 | `harness/` | 2 | TypeScript | `proto` (contract) | **Complete** (MVP: gRPC server, echo + Claude Code adapters, context loader) |
-| `factory/sandbox` | 3 | Go | `cmd/forge` or lib API | **Planned** |
+| `factory/sandbox` | 3 | Go | `cmd/forge` or lib API | **Complete** |
+| `factory/workspace` | 3 | Go | git | **Complete** |
+| `factory/orchestrator` | 3 | Go | `core/blueprint`, sandbox, workspace, delivery | **Complete** |
+| `factory/delivery` | 3 | Go | git provider APIs | **Complete** |
 | `factory/triggers` | 3 | Go | `factory/orchestrator` | **Planned** |
-| `factory/orchestrator` | 3 | Go | `core/blueprint`, sandbox | **Planned** |
-| `factory/delivery` | 3 | Go | git provider APIs | **Planned** |
 | `cmd/forged` | 3 | Go | factory packages | **Planned** (daemon) |
 
 ---
@@ -149,12 +141,13 @@ depth is in `docs/design.md`.
 - Adapters: **Echo**, **Claude Code** (headless); later Goose/Codex.
 - Subsystems over time: context budget (partial), quality/eval, skills, memory, toolshed.
 
-### Layer 3 — `factory/` (planned)
+### Layer 3 — `factory/` (MVP complete)
 
-- **Sandbox**: container lifecycle, mounts, network policy, git clone/push.
-- **Triggers**: CLI (done in Layer 1 first), then Slack/webhook/GitHub.
-- **Orchestrator**: parallel runs, quotas, cancellation, cost/time tracking.
-- **Delivery**: PRs, CI polling, human review queue policies.
+- **Sandbox** (`factory/sandbox/`): Docker container lifecycle, image management, resource limits, network policy.
+- **Workspace** (`factory/workspace/`): Git worktree creation and cleanup for isolated runs.
+- **Orchestrator** (`factory/orchestrator/`): Pipeline wiring workspace → sandbox → delivery with structured lifecycle events.
+- **Delivery** (`factory/delivery/`): Git push + PR creation via `gh` CLI.
+- **Triggers**: CLI (done in Layer 1 first), then Slack/webhook/GitHub (planned).
 
 ---
 
@@ -185,23 +178,37 @@ with mock executor for `run`.
 (Echo or Claude Code) → return consolidated agent output → structured success/failure.  
 **Output:** gRPC response consumed by Go `GrpcAgentExecutor`.
 
-### `factory/sandbox` — Story (placeholder)
+### `factory/sandbox` — Story
 
-**Input:** Run id, repo URL/ref, env secrets policy.  
-**Path:** Start container → clone → run forge/harness inside → collect artifacts.  
-**Output:** Mounted workspace changes and logs.
+**Input:** `SandboxConfig` (image, workspace dir, env, limits, network mode) + command.  
+**Path:** `EnsureImage` checks local cache via `docker inspect`, pulls if missing →
+`Run` builds `docker run --rm` args with volume mounts, env, resource limits,
+network policy → executes via `CommandRunner` → returns exit code, output, duration.  
+**Output:** `SandboxResult` with exit code, combined stdout/stderr, wall-clock duration.
 
-### `factory/orchestrator` — Story (placeholder)
+### `factory/workspace` — Story
 
-**Input:** Trigger event (CLI, webhook, schedule).  
-**Path:** Schedule run → allocate sandbox → supervise lifecycle → aggregate status.  
-**Output:** Run handle for observability; optional PR URL.
+**Input:** Repo directory + run ID.  
+**Path:** `Create` runs `git worktree add` to produce an isolated branch
+(`forge/run-<id>`) → returns `Workspace` struct with dir, branch, repo path.
+`Destroy` runs `git worktree remove --force` for cleanup.  
+**Output:** Isolated working tree for sandbox to mount; cleaned up on completion.
 
-### `factory/delivery` — Story (placeholder)
+### `factory/orchestrator` — Story
 
-**Input:** Successful run with git commits on a branch.  
-**Path:** Push branch → open PR from template → apply labels/reviewers.  
-**Output:** PR link or actionable error.
+**Input:** `RunRequest` (task, blueprint, repo, image, adapter, env, timeout, NoPR flag).  
+**Path:** Generate run ID → create workspace (git worktree) → ensure Docker image →
+build sandbox command from request flags → run container → if exit 0 and NoPR=false,
+deliver (push + PR) → record structured `RunEvent` at each phase → defer workspace
+destroy.  
+**Output:** `RunResult` with status (passed/failed), branch, PR URL, output, events.
+
+### `factory/delivery` — Story
+
+**Input:** Workspace dir, branch name, `DeliveryConfig` (remote, base branch, PR title/body).  
+**Path:** `git push <remote> <branch>` → if PR title set, `gh pr create` with title,
+body, head, optional base → parse PR URL from stdout.  
+**Output:** `DeliveryResult` with pushed flag, PR created flag, PR URL.
 
 ---
 
@@ -321,7 +328,7 @@ forge/
 | Built-in blueprints | **Done** | `standard-implementation`, `bug-fix` |
 | CLI | **In progress** | `run` supports mock executor or `--harness` gRPC address |
 | Harness (TS) | **Done** | MVP: echo + Claude adapters, context loader, gRPC server |
-| Factory (Go) | **Not started** | See `docs/design.md` Layer 3 |
+| Factory (Go) | **Complete** | sandbox, orchestrator, delivery, workspace, CLI wiring |
 | Docs suite | **Done** | `docs/design.md`, `docs/prd-forge.md`, `references/references.md` |
 
 ---

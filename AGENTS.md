@@ -11,7 +11,10 @@ map** for repo layout, module status, and links to all design docs.
 - `harness/` -- Layer 2: Intelligence harness (TypeScript gRPC server, adapters, context loader)
 - `internal/grpcexec/` -- Go gRPC client bridging Layer 1 engine to Layer 2 harness
 - `proto/forge/v1/` -- gRPC service definition (ForgeAgent)
-- `factory/` -- Layer 3: Infrastructure factory (Go, future)
+- `factory/sandbox/` -- Docker container lifecycle for isolated runs
+- `factory/workspace/` -- Git worktree creation/cleanup
+- `factory/delivery/` -- Git push + PR creation via gh
+- `factory/orchestrator/` -- Run pipeline (workspace -> sandbox -> delivery)
 
 ## Key Concepts
 

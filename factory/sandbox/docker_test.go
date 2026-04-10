@@ -7,6 +7,49 @@ import (
 	"testing"
 )
 
+func TestExecRunnerSuccess(t *testing.T) {
+	r := &ExecRunner{}
+	output, code, err := r.Run(context.Background(), "echo", "hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0", code)
+	}
+	if !strings.Contains(output, "hello") {
+		t.Errorf("output = %q, want to contain 'hello'", output)
+	}
+}
+
+func TestExecRunnerNonZeroExit(t *testing.T) {
+	r := &ExecRunner{}
+	_, code, err := r.Run(context.Background(), "sh", "-c", "exit 42")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if code != 42 {
+		t.Errorf("exit code = %d, want 42", code)
+	}
+}
+
+func TestExecRunnerCommandNotFound(t *testing.T) {
+	r := &ExecRunner{}
+	_, code, err := r.Run(context.Background(), "forge-nonexistent-cmd-xyz")
+	if err == nil {
+		t.Fatal("expected error for nonexistent command")
+	}
+	if code != -1 {
+		t.Errorf("exit code = %d, want -1", code)
+	}
+}
+
+func TestNewDockerSandboxNilRunner(t *testing.T) {
+	ds := NewDockerSandbox(nil)
+	if ds == nil {
+		t.Fatal("expected non-nil DockerSandbox")
+	}
+}
+
 type mockRunner struct {
 	calls []mockCall
 	idx   int
@@ -125,5 +168,40 @@ func TestDockerSandboxRunRespectsContextCancel(t *testing.T) {
 	_, err := ds.Run(ctx, SandboxConfig{Image: "forge:latest"}, []string{})
 	if err == nil {
 		t.Fatal("expected error when context is already cancelled")
+	}
+}
+
+func TestDockerSandboxEnsureImagePullFails(t *testing.T) {
+	runner := &mockRunner{calls: []mockCall{
+		{wantName: "docker", exitCode: 1},
+		{wantName: "docker", output: "error", exitCode: 1},
+	}}
+	ds := NewDockerSandbox(runner)
+	err := ds.EnsureImage(context.Background(), SandboxConfig{Image: "bad:image"})
+	if err == nil {
+		t.Fatal("expected error when pull fails")
+	}
+}
+
+func TestDockerSandboxEnsureImageInspectError(t *testing.T) {
+	runner := &mockRunner{calls: []mockCall{
+		{wantName: "docker", err: fmt.Errorf("connection refused")},
+	}}
+	ds := NewDockerSandbox(runner)
+	err := ds.EnsureImage(context.Background(), SandboxConfig{Image: "forge:latest"})
+	if err == nil {
+		t.Fatal("expected error when docker inspect fails with error")
+	}
+}
+
+func TestDockerSandboxEnsureImagePullError(t *testing.T) {
+	runner := &mockRunner{calls: []mockCall{
+		{wantName: "docker", exitCode: 1},
+		{wantName: "docker", err: fmt.Errorf("network error")},
+	}}
+	ds := NewDockerSandbox(runner)
+	err := ds.EnsureImage(context.Background(), SandboxConfig{Image: "forge:latest"})
+	if err == nil {
+		t.Fatal("expected error when pull returns error")
 	}
 }

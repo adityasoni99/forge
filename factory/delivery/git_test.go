@@ -83,3 +83,45 @@ func TestGitDeliveryNoPR(t *testing.T) {
 		t.Error("expected PRCreated=false when no PRTitle")
 	}
 }
+
+func TestGitDeliveryPRCreateFails(t *testing.T) {
+	runner := &mockCmdRunner{calls: []runCall{
+		{output: "", exitCode: 0},
+		{output: "error", exitCode: 1},
+	}}
+	gd := NewGitDelivery(runner)
+	_, err := gd.Deliver(context.Background(), "/tmp/ws", "forge/run-1", DeliveryConfig{
+		Remote:  "origin",
+		PRTitle: "forge: test",
+	})
+	if err == nil {
+		t.Fatal("expected error when PR creation fails")
+	}
+}
+
+func TestGitDeliveryDefaultRemote(t *testing.T) {
+	runner := &mockCmdRunner{calls: []runCall{
+		{output: "", exitCode: 0},
+	}}
+	gd := NewGitDelivery(runner)
+	result, err := gd.Deliver(context.Background(), "/tmp/ws", "forge/run-1", DeliveryConfig{})
+	if err != nil {
+		t.Fatalf("Deliver: %v", err)
+	}
+	if !result.Pushed {
+		t.Error("expected Pushed=true with default remote")
+	}
+}
+
+func TestGitDeliveryPushError(t *testing.T) {
+	runner := &mockCmdRunner{calls: []runCall{
+		{output: "", exitCode: 0, err: fmt.Errorf("network error")},
+	}}
+	gd := NewGitDelivery(runner)
+	_, err := gd.Deliver(context.Background(), "/tmp/ws", "forge/run-1", DeliveryConfig{
+		Remote: "origin",
+	})
+	if err == nil {
+		t.Fatal("expected error when push returns error")
+	}
+}
