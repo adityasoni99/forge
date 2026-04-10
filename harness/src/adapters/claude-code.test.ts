@@ -53,6 +53,44 @@ describe('ClaudeCodeAdapter', () => {
 		expect(result.success).toBe(false);
 		expect(result.error).toBeDefined();
 	});
+
+	it('returns failure when spawn emits error', async () => {
+		const mockSpawn = vi.mocked(child_process.spawn);
+		const proc = new EventEmitter() as EventEmitter & {
+			stdout: Readable;
+			stderr: Readable;
+		};
+		proc.stdout = Readable.from([]);
+		proc.stderr = Readable.from([]);
+		mockSpawn.mockReturnValue(proc as child_process.ChildProcess);
+
+		const adapter = new ClaudeCodeAdapter();
+		const promise = adapter.execute({
+			prompt: 'Hi',
+			workingDirectory: '/tmp',
+			configJson: '{}',
+		});
+		setTimeout(() => proc.emit('error', new Error('ENOENT')), 5);
+		const result = await promise;
+		expect(result.success).toBe(false);
+		expect(result.error).toContain('failed to spawn claude');
+		expect(result.error).toContain('ENOENT');
+	});
+
+	it('uses raw stdout when JSON parse fails on success exit', async () => {
+		const mockSpawn = vi.mocked(child_process.spawn);
+		const mockProcess = createMockProcess('not-json-output', '', 0);
+		mockSpawn.mockReturnValue(mockProcess as child_process.ChildProcess);
+
+		const adapter = new ClaudeCodeAdapter();
+		const result = await adapter.execute({
+			prompt: 'Run',
+			workingDirectory: '/tmp',
+			configJson: '{}',
+		});
+		expect(result.success).toBe(true);
+		expect(result.output).toBe('not-json-output');
+	});
 });
 
 function createMockProcess(

@@ -3,6 +3,9 @@
 
 # Go coverage output
 coverage.out
+coverage-grpcexec.out
+coverage*.out
 
 # Node.js (harness)
 node_modules/
+harness/coverage/

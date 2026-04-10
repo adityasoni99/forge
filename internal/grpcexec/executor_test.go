@@ -3,6 +3,7 @@ package grpcexec
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net"
 	"testing"
 	"time"
@@ -42,6 +43,34 @@ func startMockServer(t *testing.T) (string, *mockForgeAgentServer, func()) {
 	return lis.Addr().String(), mock, func() { srv.Stop() }
 }
 
+// failingForgeAgentServer returns Success=false (no gRPC error).
+type failingForgeAgentServer struct {
+	forgev1.UnimplementedForgeAgentServer
+}
+
+func (s *failingForgeAgentServer) ExecuteAgent(
+	_ context.Context,
+	_ *forgev1.ExecuteAgentRequest,
+) (*forgev1.ExecuteAgentResponse, error) {
+	return &forgev1.ExecuteAgentResponse{
+		Output:  "",
+		Success: false,
+		Error:   "agent error from harness",
+	}, nil
+}
+
+func startFailingMockServer(t *testing.T) (addr string, cleanup func()) {
+	t.Helper()
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	srv := grpc.NewServer()
+	forgev1.RegisterForgeAgentServer(srv, &failingForgeAgentServer{})
+	go func() { _ = srv.Serve(lis) }()
+	return lis.Addr().String(), func() { srv.Stop() }
+}
+
 func TestGrpcAgentExecutorSuccess(t *testing.T) {
 	addr, mock, cleanup := startMockServer(t)
 	defer cleanup()
@@ -72,6 +101,43 @@ func TestGrpcAgentExecutorSuccess(t *testing.T) {
 	}
 	if mock.lastRequest.WorkingDirectory != "/tmp/project" {
 		t.Errorf("working_directory = %q, want /tmp/project", mock.lastRequest.WorkingDirectory)
+	}
+}
+
+func TestGrpcAgentExecutorServerReturnsFailure(t *testing.T) {
+	addr, cleanup := startFailingMockServer(t)
+	defer cleanup()
+
+	executor, err := NewGrpcAgentExecutor(addr, "/tmp", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("NewGrpcAgentExecutor: %v", err)
+	}
+	defer executor.Close()
+
+	_, err = executor.Execute(context.Background(), "hi", nil)
+	if err == nil {
+		t.Fatal("expected error when server returns success=false")
+	}
+	if err.Error() == "" {
+		t.Fatal("expected non-empty error message")
+	}
+}
+
+func TestGrpcAgentExecutorMarshalError(t *testing.T) {
+	addr, _, cleanup := startMockServer(t)
+	defer cleanup()
+
+	executor, err := NewGrpcAgentExecutor(addr, "/tmp", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("NewGrpcAgentExecutor: %v", err)
+	}
+	defer executor.Close()
+
+	_, err = executor.Execute(context.Background(), "p", map[string]interface{}{
+		"bad": math.NaN(),
+	})
+	if err == nil {
+		t.Fatal("expected marshal error for NaN in config")
 	}
 }
 

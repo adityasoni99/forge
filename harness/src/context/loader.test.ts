@@ -29,6 +29,13 @@ describe('loadContext', () => {
     expect(ctx.rootDocName).toBe('CLAUDE.md');
   });
 
+  it('falls back to README.md if no AGENTS.md or CLAUDE.md', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Readme only');
+    const ctx = await loadContext(tmpDir);
+    expect(ctx.rootDoc).toContain('Readme only');
+    expect(ctx.rootDocName).toBe('README.md');
+  });
+
   it('loads .forge/rules/*.md files', async () => {
     fs.mkdirSync(path.join(tmpDir, '.forge', 'rules'), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, '.forge', 'rules', 'auth.md'), 'Auth rules.');
@@ -65,5 +72,36 @@ describe('loadContext', () => {
     expect(composed).toContain('ROOT');
     expect(composed).toContain('Task');
     expect(composed).not.toContain(longRule);
+  });
+
+  it('includes directory rules in composed prompt when rules fit budget', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'AGENTS.md'), 'ROOT');
+    fs.mkdirSync(path.join(tmpDir, '.forge', 'rules'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.forge', 'rules', 'z.md'), 'Rule Z');
+    const ctx = await loadContext(tmpDir, { maxTokens: 2000 });
+    const composed = ctx.composePrompt('Do the thing');
+    expect(composed).toContain('=== Directory Rules ===');
+    expect(composed).toContain('--- z.md ---');
+    expect(composed).toContain('Rule Z');
+  });
+
+  it('truncates composed prompt when join overhead exceeds maxTokens', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'AGENTS.md'), 'R'.repeat(200));
+    fs.mkdirSync(path.join(tmpDir, '.forge', 'rules'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.forge', 'rules', 'a.md'), 'Z'.repeat(120));
+    const ctx = await loadContext(tmpDir, { maxTokens: 95 });
+    const composed = ctx.composePrompt('TASK');
+    expect(composed.length).toBeGreaterThan(0);
+    expect(composed).toContain('TASK');
+    expect(composed.length).toBeLessThan(2000);
+  });
+
+  it('iterates truncation until within token budget', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'AGENTS.md'), 'Q'.repeat(5000));
+    const ctx = await loadContext(tmpDir, { maxTokens: 50 });
+    const composed = ctx.composePrompt('T');
+    expect(composed.length).toBeGreaterThan(24);
+    expect(composed).toContain('T');
+    expect(composed.length).toBeLessThan(5000);
   });
 });

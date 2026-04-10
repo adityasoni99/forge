@@ -49,4 +49,42 @@ describe('AgentService', () => {
     expect(response.success).toBe(false);
     expect(response.error).toContain('agent crashed');
   });
+
+  it('returns structured error when adapter throws', async () => {
+    const throwingAdapter = {
+      async execute() {
+        throw new Error('boom');
+      },
+    };
+    const service = new AgentService(throwingAdapter);
+    const response = await service.executeAgent({
+      prompt: 'x',
+      config_json: '{}',
+      working_directory: '/tmp',
+      blueprint_name: 'b',
+      node_id: 'n',
+      run_id: 'r',
+    });
+    expect(response.success).toBe(false);
+    expect(response.error).toContain('boom');
+  });
+
+  it('stringifies non-Error throws in catch path', async () => {
+    const throwingAdapter = {
+      async execute() {
+        throw 'string-throw';
+      },
+    };
+    const service = new AgentService(throwingAdapter);
+    const response = await service.executeAgent({
+      prompt: 'x',
+      config_json: '{}',
+      working_directory: '/tmp',
+      blueprint_name: 'b',
+      node_id: 'n',
+      run_id: 'r',
+    });
+    expect(response.success).toBe(false);
+    expect(response.error).toContain('string-throw');
+  });
 });
