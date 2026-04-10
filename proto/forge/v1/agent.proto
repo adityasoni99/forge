@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package forge.v1;
+
+option go_package = "github.com/aditya-soni/forge/internal/grpcexec/forgev1";
+
+service ForgeAgent {
+  rpc ExecuteAgent(ExecuteAgentRequest) returns (ExecuteAgentResponse);
+}
+
+message ExecuteAgentRequest {
+  string prompt = 1;
+  string config_json = 2;
+  string working_directory = 3;
+  string blueprint_name = 4;
+  string node_id = 5;
+  string run_id = 6;
+}
+
+message ExecuteAgentResponse {
+  string output = 1;
+  bool success = 2;
+  string error = 3;
+}
