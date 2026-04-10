@@ -9,6 +9,9 @@ import (
 
 	"github.com/aditya-soni/forge/blueprints"
 	"github.com/aditya-soni/forge/core/blueprint"
+	"github.com/aditya-soni/forge/internal/grpcexec"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -32,7 +35,7 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  blueprint validate <file>  Validate a blueprint YAML file")
 	fmt.Println("  blueprint list             List built-in blueprints")
-	fmt.Println("  blueprint run <file>       Dry-run a blueprint (mock executor)")
+	fmt.Println("  blueprint run [--harness <addr>] <file>  Run blueprint (mock or gRPC harness)")
 }
 
 func handleBlueprint(args []string) {
@@ -52,14 +55,41 @@ func handleBlueprint(args []string) {
 		cmdList()
 	case "run":
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: forge blueprint run <file>")
+			fmt.Fprintln(os.Stderr, "usage: forge blueprint run [--harness <addr>] <file>")
 			os.Exit(1)
 		}
-		cmdRun(args[1])
+		harnessAddr, file, err := parseBlueprintRunArgs(args[1:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "blueprint run: %v\n", err)
+			os.Exit(1)
+		}
+		cmdRun(file, harnessAddr)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown blueprint subcommand: %s\n", args[0])
 		os.Exit(1)
 	}
+}
+
+func parseBlueprintRunArgs(args []string) (harnessAddr, file string, err error) {
+	var files []string
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--harness":
+			if i+1 >= len(args) {
+				return "", "", fmt.Errorf("--harness requires an address")
+			}
+			i++
+			harnessAddr = args[i]
+		case strings.HasPrefix(args[i], "-"):
+			return "", "", fmt.Errorf("unknown flag: %s", args[i])
+		default:
+			files = append(files, args[i])
+		}
+	}
+	if len(files) != 1 {
+		return "", "", fmt.Errorf("expected exactly one blueprint file, got %d", len(files))
+	}
+	return harnessAddr, files[0], nil
 }
 
 type echoExecutor struct{}
@@ -127,7 +157,7 @@ func cmdList() {
 	}
 }
 
-func cmdRun(file string) {
+func cmdRun(file string, harnessAddr string) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read error: %v\n", err)
@@ -138,13 +168,37 @@ func cmdRun(file string) {
 		fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
 		os.Exit(1)
 	}
-	g, err := bp.BuildGraph(&echoExecutor{})
+
+	var exec blueprint.AgentExecutor
+	if harnessAddr != "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "getwd: %v\n", err)
+			os.Exit(1)
+		}
+		grpcExec, err := grpcexec.NewGrpcAgentExecutor(harnessAddr, wd,
+			grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "harness client: %v\n", err)
+			os.Exit(1)
+		}
+		defer grpcExec.Close()
+		exec = grpcExec
+	} else {
+		exec = &echoExecutor{}
+	}
+
+	g, err := bp.BuildGraph(exec)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "build error: %v\n", err)
 		os.Exit(1)
 	}
 	engine := blueprint.NewEngine(g, bp.Name)
-	fmt.Printf("Running blueprint %q (dry-run with mock executor)...\n", bp.Name)
+	if harnessAddr != "" {
+		fmt.Printf("Running blueprint %q (harness at %s)...\n", bp.Name, harnessAddr)
+	} else {
+		fmt.Printf("Running blueprint %q (dry-run with mock executor)...\n", bp.Name)
+	}
 	state, err := engine.Execute(context.Background())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "execution error: %v\n", err)
