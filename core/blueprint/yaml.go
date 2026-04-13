@@ -150,6 +150,23 @@ func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
 		n.description = ny.Description
 		n.maxRetries = ny.MaxRetries
 		return n, nil
+	case "eval":
+		prompt, _ := ny.Config["prompt"].(string)
+		if prompt == "" {
+			return nil, fmt.Errorf("eval node missing 'prompt' in config")
+		}
+		criteriaRaw, _ := ny.Config["criteria"].([]interface{})
+		criteria := make([]string, 0, len(criteriaRaw))
+		for _, c := range criteriaRaw {
+			if s, ok := c.(string); ok {
+				criteria = append(criteria, s)
+			}
+		}
+		threshold := 0.7
+		if t, ok := ny.Config["threshold"].(float64); ok {
+			threshold = t
+		}
+		return NewEvalNode(id, prompt, criteria, threshold, executor), nil
 	default:
 		return nil, fmt.Errorf("unknown node type: %q", ny.Type)
 	}

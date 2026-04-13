@@ -542,3 +542,84 @@ edges: []
 		t.Errorf("allowed_tools = %v", tools)
 	}
 }
+
+func TestBuildGraphEvalNode(t *testing.T) {
+	yamlData := `
+name: eval-test
+version: "0.1"
+start: evaluate
+nodes:
+  evaluate:
+    type: eval
+    config:
+      prompt: "Rate the code quality"
+      criteria:
+        - correctness
+        - readability
+      threshold: 0.8
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{output: "0.9"})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	raw, ok := g.GetNode("evaluate")
+	if !ok {
+		t.Fatal("node 'evaluate' not found")
+	}
+	if raw.Type() != NodeTypeEval {
+		t.Errorf("Type() = %v, want Eval", raw.Type())
+	}
+}
+
+func TestBuildGraphEvalNodeMissingPrompt(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: e
+nodes:
+  e:
+    type: eval
+    config:
+      threshold: 0.7
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for eval node without prompt")
+	}
+}
+
+func TestBuildGraphEvalNodeDefaultThreshold(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: e
+nodes:
+  e:
+    type: eval
+    config:
+      prompt: "Check it"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{output: "0.75"})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	_, ok := g.GetNode("e")
+	if !ok {
+		t.Fatal("node 'e' not found")
+	}
+}
