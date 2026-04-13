@@ -10,6 +10,7 @@ func TestNodeTypeString(t *testing.T) {
 		{NodeTypeAgentic, "agentic"},
 		{NodeTypeDeterministic, "deterministic"},
 		{NodeTypeGate, "gate"},
+		{NodeTypeEval, "eval"},
 	}
 	for _, tt := range tests {
 		if got := tt.nt.String(); got != tt.want {
