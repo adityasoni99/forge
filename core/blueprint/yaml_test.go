@@ -681,3 +681,139 @@ func TestBuiltinEvalSkillBlueprintValid(t *testing.T) {
 		t.Errorf("implement type = %v, want Agentic", implNode.Type())
 	}
 }
+
+func TestDependsOnGeneratesEdges(t *testing.T) {
+	yamlData := `
+name: depends-test
+version: "0.1"
+start: plan
+nodes:
+  plan:
+    type: agentic
+    config:
+      prompt: "Create plan"
+  implement:
+    type: agentic
+    depends_on:
+      - plan
+    config:
+      prompt: "Implement"
+  test:
+    type: deterministic
+    depends_on:
+      - implement
+    config:
+      command: "echo test"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{output: "ok"})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	if err := g.Validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	next := g.NextNodes("plan", "")
+	found := false
+	for _, n := range next {
+		if n == "implement" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("plan -> implement edge not generated from depends_on; next = %v", next)
+	}
+
+	next2 := g.NextNodes("implement", "")
+	found2 := false
+	for _, n := range next2 {
+		if n == "test" {
+			found2 = true
+		}
+	}
+	if !found2 {
+		t.Errorf("implement -> test edge not generated from depends_on; next = %v", next2)
+	}
+}
+
+func TestDependsOnCombinesWithExplicitEdges(t *testing.T) {
+	yamlData := `
+name: combined
+version: "0.1"
+start: a
+nodes:
+  a:
+    type: deterministic
+    config:
+      command: "echo a"
+  b:
+    type: deterministic
+    depends_on:
+      - a
+    config:
+      command: "echo b"
+  c:
+    type: deterministic
+    config:
+      command: "echo c"
+edges:
+  - from: a
+    to: c
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{output: "ok"})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+
+	next := g.NextNodes("a", "")
+	if len(next) < 2 {
+		t.Errorf("a should have edges to both b and c; got %v", next)
+	}
+}
+
+func TestDependsOnUnknownNodeErrors(t *testing.T) {
+	yamlData := `
+name: bad-dep
+version: "0.1"
+start: a
+nodes:
+  a:
+    type: deterministic
+    depends_on:
+      - ghost
+    config:
+      command: "echo a"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for depends_on referencing unknown node")
+	}
+}
+
+func TestBackwardCompatibilityNoDependsOn(t *testing.T) {
+	bp, err := ParseBlueprintYAML([]byte(testYAML))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{output: "done"})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	if g.NodeCount() != 4 {
+		t.Errorf("NodeCount = %d, want 4", g.NodeCount())
+	}
+}

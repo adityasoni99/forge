@@ -30,6 +30,7 @@ type NodeYAML struct {
 	ConcurrencySafe *bool                  `yaml:"concurrency_safe,omitempty"`
 	AllowedTools    []string               `yaml:"allowed_tools,omitempty"`
 	MaxRetries      int                    `yaml:"max_retries,omitempty"`
+	DependsOn       []string               `yaml:"depends_on,omitempty"`
 	Config          map[string]interface{} `yaml:"config"`
 }
 
@@ -61,6 +62,9 @@ func (bp *BlueprintYAML) BuildGraph(executor AgentExecutor) (*Graph, error) {
 	if err := bp.addNodesToGraph(g, executor); err != nil {
 		return nil, err
 	}
+	if err := bp.addDependsOnEdges(g); err != nil {
+		return nil, err
+	}
 	for _, ey := range bp.Edges {
 		if err := g.AddEdge(Edge{From: ey.From, To: ey.To, Condition: ey.Condition}); err != nil {
 			return nil, err
@@ -70,6 +74,17 @@ func (bp *BlueprintYAML) BuildGraph(executor AgentExecutor) (*Graph, error) {
 		return nil, err
 	}
 	return g, nil
+}
+
+func (bp *BlueprintYAML) addDependsOnEdges(g *Graph) error {
+	for id, ny := range bp.Nodes {
+		for _, dep := range ny.DependsOn {
+			if err := g.AddEdge(Edge{From: dep, To: id}); err != nil {
+				return fmt.Errorf("depends_on edge %s -> %s: %w", dep, id, err)
+			}
+		}
+	}
+	return nil
 }
 
 func (bp *BlueprintYAML) addNodesToGraph(g *Graph, executor AgentExecutor) error {
