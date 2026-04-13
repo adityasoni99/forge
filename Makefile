@@ -1,8 +1,15 @@
-.PHONY: lint test
+.PHONY: lint test test-go test-ts ci
 lint:
 	go vet ./...
 test:
 	go test ./...
+
+test-go: test
+
+test-ts:
+	cd harness && npm test
+
+ci: test-go test-ts docker-build
 
 .PHONY: forge-linux docker-build docker-build-arm
 
