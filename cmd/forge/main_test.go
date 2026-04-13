@@ -62,6 +62,43 @@ func TestCLIRunNoArgs(t *testing.T) {
 	}
 }
 
+func TestParseBlueprintRunArgsBuiltin(t *testing.T) {
+	harness, file, builtin, task, err := parseBlueprintRunArgs([]string{
+		"--builtin", "standard-implementation",
+		"--task", "add JSON logging",
+		"--harness", "127.0.0.1:50051",
+	})
+	if err != nil {
+		t.Fatalf("parseBlueprintRunArgs returned error: %v", err)
+	}
+	if harness != "127.0.0.1:50051" {
+		t.Fatalf("harness = %q, want %q", harness, "127.0.0.1:50051")
+	}
+	if file != "" {
+		t.Fatalf("file = %q, want empty", file)
+	}
+	if builtin != "standard-implementation" {
+		t.Fatalf("builtin = %q, want %q", builtin, "standard-implementation")
+	}
+	if task != "add JSON logging" {
+		t.Fatalf("task = %q, want %q", task, "add JSON logging")
+	}
+}
+
+func TestResolveBlueprintDataBuiltinTemplate(t *testing.T) {
+	data, label, err := resolveBlueprintData("", "standard-implementation", "add JSON logging")
+	if err != nil {
+		t.Fatalf("resolveBlueprintData returned error: %v", err)
+	}
+	if label != "standard-implementation" {
+		t.Fatalf("label = %q, want %q", label, "standard-implementation")
+	}
+	got := string(data)
+	if !strings.Contains(got, "add JSON logging") {
+		t.Fatalf("resolved blueprint missing task substitution: %s", got)
+	}
+}
+
 func TestCLINoArgs(t *testing.T) {
 	cmd := forgeCmd(t)
 	out, err := cmd.CombinedOutput()

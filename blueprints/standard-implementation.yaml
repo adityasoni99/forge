@@ -6,11 +6,11 @@ nodes:
   plan:
     type: agentic
     config:
-      prompt: "Analyze the task and create a detailed implementation plan"
+      prompt: "Analyze the task and create a detailed implementation plan for: {{task}}"
   implement:
     type: agentic
     config:
-      prompt: "Implement the plan. Write clean, tested code."
+      prompt: "Implement the requested task: {{task}}. Write clean, tested code."
   lint:
     type: deterministic
     config:

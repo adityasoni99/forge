@@ -43,7 +43,7 @@ func printUsage() {
 	fmt.Println("  run \"task\" [flags]         Run a task in a Docker sandbox")
 	fmt.Println("  blueprint validate <file>  Validate a blueprint YAML file")
 	fmt.Println("  blueprint list             List built-in blueprints")
-	fmt.Println("  blueprint run [--harness <addr>] <file>  Run blueprint (mock or gRPC harness)")
+	fmt.Println("  blueprint run [--harness <addr>] [--builtin <name> | <file>] [--task <text>]")
 }
 
 func cmdForgeRun(args []string) {
@@ -119,41 +119,84 @@ func handleBlueprint(args []string) {
 		cmdList()
 	case "run":
 		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: forge blueprint run [--harness <addr>] <file>")
+			fmt.Fprintln(os.Stderr, "usage: forge blueprint run [--harness <addr>] [--builtin <name> | <file>] [--task <text>]")
 			os.Exit(1)
 		}
-		harnessAddr, file, err := parseBlueprintRunArgs(args[1:])
+		harnessAddr, file, builtin, task, err := parseBlueprintRunArgs(args[1:])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "blueprint run: %v\n", err)
 			os.Exit(1)
 		}
-		cmdRun(file, harnessAddr)
+		cmdRun(file, builtin, task, harnessAddr)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown blueprint subcommand: %s\n", args[0])
 		os.Exit(1)
 	}
 }
 
-func parseBlueprintRunArgs(args []string) (harnessAddr, file string, err error) {
+func parseBlueprintRunArgs(args []string) (harnessAddr, file, builtin, task string, err error) {
 	var files []string
 	for i := 0; i < len(args); i++ {
 		switch {
 		case args[i] == "--harness":
 			if i+1 >= len(args) {
-				return "", "", fmt.Errorf("--harness requires an address")
+				return "", "", "", "", fmt.Errorf("--harness requires an address")
 			}
 			i++
 			harnessAddr = args[i]
+		case args[i] == "--builtin":
+			if i+1 >= len(args) {
+				return "", "", "", "", fmt.Errorf("--builtin requires a name")
+			}
+			i++
+			builtin = args[i]
+		case args[i] == "--task":
+			if i+1 >= len(args) {
+				return "", "", "", "", fmt.Errorf("--task requires a value")
+			}
+			i++
+			task = args[i]
 		case strings.HasPrefix(args[i], "-"):
-			return "", "", fmt.Errorf("unknown flag: %s", args[i])
+			return "", "", "", "", fmt.Errorf("unknown flag: %s", args[i])
 		default:
 			files = append(files, args[i])
 		}
 	}
-	if len(files) != 1 {
-		return "", "", fmt.Errorf("expected exactly one blueprint file, got %d", len(files))
+	if builtin != "" && len(files) > 0 {
+		return "", "", "", "", fmt.Errorf("--builtin and positional file are mutually exclusive")
 	}
-	return harnessAddr, files[0], nil
+	if builtin == "" && len(files) != 1 {
+		return "", "", "", "", fmt.Errorf("expected exactly one blueprint file, got %d", len(files))
+	}
+	if len(files) == 1 {
+		file = files[0]
+	}
+	return harnessAddr, file, builtin, task, nil
+}
+
+func resolveBlueprintData(file, builtin, task string) ([]byte, string, error) {
+	var data []byte
+	var label string
+	var err error
+
+	switch {
+	case file != "":
+		data, err = os.ReadFile(file)
+		label = file
+	case builtin != "":
+		data, err = blueprints.BuiltIn.ReadFile(builtin + ".yaml")
+		label = builtin
+	default:
+		return nil, "", fmt.Errorf("no blueprint source specified")
+	}
+	if err != nil {
+		return nil, "", err
+	}
+
+	if task != "" {
+		data = []byte(strings.ReplaceAll(string(data), "{{task}}", task))
+	}
+	return data, label, nil
 }
 
 type echoExecutor struct{}
@@ -221,15 +264,15 @@ func cmdList() {
 	}
 }
 
-func cmdRun(file string, harnessAddr string) {
-	data, err := os.ReadFile(file)
+func cmdRun(file, builtin, task, harnessAddr string) {
+	data, label, err := resolveBlueprintData(file, builtin, task)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read error: %v\n", err)
 		os.Exit(1)
 	}
 	bp, err := blueprint.ParseBlueprintYAML(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "parse error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "parse error (%s): %v\n", label, err)
 		os.Exit(1)
 	}
 
@@ -254,14 +297,14 @@ func cmdRun(file string, harnessAddr string) {
 
 	g, err := bp.BuildGraph(exec)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "build error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "build error (%s): %v\n", label, err)
 		os.Exit(1)
 	}
 	engine := blueprint.NewEngine(g, bp.Name)
 	if harnessAddr != "" {
-		fmt.Printf("Running blueprint %q (harness at %s)...\n", bp.Name, harnessAddr)
+		fmt.Printf("Running blueprint %q (source %q, harness at %s)...\n", bp.Name, label, harnessAddr)
 	} else {
-		fmt.Printf("Running blueprint %q (dry-run with mock executor)...\n", bp.Name)
+		fmt.Printf("Running blueprint %q (source %q, dry-run with mock executor)...\n", bp.Name, label)
 	}
 	state, err := engine.Execute(context.Background())
 	if err != nil {

@@ -6,11 +6,11 @@ nodes:
   reproduce:
     type: agentic
     config:
-      prompt: "Write a failing test that reproduces the bug"
+      prompt: "Write a failing test that reproduces this bug: {{task}}"
   fix:
     type: agentic
     config:
-      prompt: "Fix the bug. The reproducing test must pass."
+      prompt: "Fix the bug described here: {{task}}. The reproducing test must pass."
   test:
     type: deterministic
     config:
