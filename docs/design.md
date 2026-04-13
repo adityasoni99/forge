@@ -678,8 +678,8 @@ plumbing; see [aicurs patterns](../references/aicurs-patterns.md).
 - **Protobuf + gRPC** service (e.g. `proto/forge/v1/agent.proto`) with a thin Go
   client implementing `AgentExecutor`.
 
-**Status:** specified in `.cursor/plans/layer_2_harness_mvp_07ee3081.plan.md`;
-not yet merged as top-level `harness/` in this repo snapshot.
+**Status:** implemented in `harness/` with gRPC server, echo + Claude adapters,
+context loading, and Go bridge in `internal/grpcexec/`.
 
 ---
 
@@ -735,7 +735,8 @@ Leverage **cc-connect**-style provenance for chat bridges:
   orphaned siblings from interrupted parallel branches and reconstruct the true
   execution tree from parent pointers.
 
-**Status:** planned; no top-level `factory/` package in this repo snapshot.
+**Status:** implemented in `factory/` with sandbox, workspace, orchestrator, and
+delivery packages. Observability and tracing are planned for v0.2+.
 
 ### 6.6 Task lifecycle
 
@@ -932,9 +933,10 @@ delivery automation in Layer 3.
 ## 14. Target repository layout
 
 Matches the **integration** story in §3.4 and the **module** breakdown in
-[project.md](../project.md). **Implemented today:** `cmd/forge`, `core/blueprint`,
-`blueprints/`, `docs/`, `references/`, `project.md`, `AGENTS.md`. Other paths are
-**planned**.
+[project.md](../project.md). **Implemented (v0.1):** `cmd/forge`, `core/blueprint`, `blueprints/`, `harness/`,
+`factory/`, `proto/`, `internal/grpcexec/`, `tests/`, `scripts/`, `.github/`,
+`docs/`, `references/`, `project.md`, `AGENTS.md`, `README.md`. Remaining paths
+(`cmd/forged`, `skills/`) are **planned** for v0.2+.
 
 ```text
 forge/

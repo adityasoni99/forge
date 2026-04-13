@@ -3,7 +3,7 @@
 > **Purpose:** Single checkpoint file for tracking what's done, what's next, and
 > where to resume. Reference this at the start of every new chat session.
 >
-> **Last updated:** 2026-04-10
+> **Last updated:** 2026-04-12
 
 ---
 
@@ -11,7 +11,7 @@
 
 | Version | Theme | Status |
 |---------|-------|--------|
-| **v0.1** | Blueprint Engine + Harness MVP + Factory MVP | **In progress** |
+| **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
 | **v0.2** | Skills, memory, parallel runs, Slack trigger | Planned |
 | **v0.3** | Multi-adapter, warm pools, learning loops | Planned |
 | **v1.0** | Production-ready factory, docs, community | Planned |
@@ -85,16 +85,16 @@
 
 ---
 
-### Layer 4: Integration + Polish — AFTER LAYER 3
+### Layer 4: Integration + Polish — COMPLETE
 
-| Task | Status |
-|------|--------|
-| End-to-end wiring: `forge run` with real Claude Code adapter | Not started |
-| README quickstart guide | Not started |
-| CI pipeline (GitHub Actions: Go tests, TS tests, Docker build) | Not started |
-| ADR updates in `docs/design.md` | Not started |
-
-**No separate plan file yet.** Will be written after Layer 3 is complete.
+| Task | Plan file | Status |
+|------|-----------|--------|
+| Blueprint source resolution + task templating | `2026-04-12-layer-4-integration-polish` | Done |
+| Align forge run, local mode, Docker entrypoint | same | Done |
+| Deterministic smoke path for integration tests | same | Done |
+| CI pipeline (GitHub Actions: Go, TS, Docker) | same | Done |
+| README quickstart guide | same | Done |
+| Design doc reconciliation | same | Done |
 
 ---
 
@@ -156,7 +156,7 @@ Planned extensions documented in Layer 2/3 plan post-MVP sections:
 | Layer 1: Blueprint Engine | `layer_1_blueprint_engine_4bd3f740` | 1 | **Complete** |
 | Layer 2: Harness MVP | `layer_2_harness_mvp_07ee3081` | 2 | **Complete** |
 | Layer 3: Factory MVP | `layer_3_factory_mvp_f6c28aa0` | 3 | **Complete** |
-| Layer 4: Integration | *(not yet written)* | 1–3 | Not started |
+| Layer 4: Integration + Polish | `2026-04-12-layer-4-integration-polish` | 1–3 | **Complete** |
 
 All plan files: `.cursor/plans/*.plan.md`
 
@@ -183,5 +183,5 @@ All plan files: `.cursor/plans/*.plan.md`
 4. Reference `project.md` for module map and `docs/design.md` for architecture.
 5. Begin implementing task-by-task per the plan's instructions.
 
-**Current checkpoint:** Layers 1–3 complete. **Next action:** Start Layer 4
-(Integration + Polish — e2e wiring, README, CI, ADR updates).
+**Current checkpoint:** Layers 1–4 complete (v0.1 MVP). **Next action:** Start v0.2
+planning (skills, tool pool assembly, EvalNode, Slack trigger, parallel runs).

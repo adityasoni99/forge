@@ -104,7 +104,7 @@ depth is in `docs/design.md`.
 |--------|-------|----------|------------|--------|
 | `core/blueprint` | 1 | Go | (none) | **Complete** (engine, graph, YAML, tests) |
 | `blueprints/` | 1 | YAML + `embed.go` | `core/blueprint` | **Complete** (built-ins embedded) |
-| `cmd/forge` | 1 | Go | `core/blueprint`, `blueprints`, optional `internal/grpcexec` | **In progress** (CLI: validate, list, run w/ mock or gRPC harness) |
+| `cmd/forge` | 1 | Go | `core/blueprint`, `blueprints`, `factory/orchestrator`, `internal/grpcexec` | **Complete** (CLI: validate, list, blueprint run, forge run) |
 | `proto/`, `internal/grpcexec/` | 1–2 | Go | `core/blueprint` | **Complete** (ForgeAgent contract, `GrpcAgentExecutor`) |
 | `harness/` | 2 | TypeScript | `proto` (contract) | **Complete** (MVP: gRPC server, echo + Claude Code adapters, context loader) |
 | `factory/sandbox` | 3 | Go | `cmd/forge` or lib API | **Complete** |
@@ -278,20 +278,20 @@ forge/
 │   │   ├── engine.go, graph.go, node.go, yaml.go, types.go
 │   │   └── compose.go             # Blueprint composition (planned)
 │   └── types/                     # Shared Go types (planned if split)
-├── harness/                       # Layer 2 — TypeScript (planned)
+├── harness/                       # Layer 2 — TypeScript (implemented)
 │   ├── adapters/                  # claude-code, goose, codex, direct-llm, cursor
 │   ├── context/
 │   ├── quality/
 │   ├── skills/
 │   ├── memory/
 │   └── toolshed/
-├── factory/                       # Layer 3 — Go (planned)
+├── factory/                       # Layer 3 — Go (implemented)
 │   ├── sandbox/
 │   ├── triggers/
 │   ├── orchestrator/
 │   └── delivery/
-├── proto/forge/v1/                # gRPC contract (planned)
-├── internal/grpcexec/             # Go gRPC AgentExecutor (planned)
+├── proto/forge/v1/                # gRPC contract (implemented)
+├── internal/grpcexec/             # Go gRPC AgentExecutor (implemented)
 ├── blueprints/                    # Built-in YAML (+ embed.go)
 ├── skills/                        # Built-in SKILL bundles (planned)
 ├── docs/
@@ -300,22 +300,18 @@ forge/
 │   └── specs/                     # deeper specs (optional)
 ├── references/
 │   └── references.md
-├── tests/                         # Repo-level integration tests (planned)
+├── tests/                         # Repo-level integration tests (implemented)
 ├── project.md
 └── AGENTS.md
 ```
 
-### Planned additions (short list)
+### Planned additions (remaining)
 
 ```text
-  proto/forge/v1/agent.proto
-  internal/grpcexec/
-  harness/
-  factory/{sandbox,triggers,orchestrator,delivery}
-  cmd/forged/
-  core/blueprint/compose.go
-  skills/
-  tests/
+  cmd/forged/                    # Factory daemon
+  core/blueprint/compose.go      # Blueprint composition
+  skills/                        # Built-in SKILL bundles
+  factory/triggers/              # Slack, webhook, cron triggers
 ```
 
 ---
@@ -326,10 +322,11 @@ forge/
 |------|--------|-------|
 | Blueprint engine | **Done** | Agentic, deterministic, gate nodes; iteration guard |
 | Built-in blueprints | **Done** | `standard-implementation`, `bug-fix` |
-| CLI | **In progress** | `run` supports mock executor or `--harness` gRPC address |
+| CLI | **Complete** | `run`, `blueprint run/validate/list`, `--builtin`, `--task`, `--harness`, `--no-sandbox` |
 | Harness (TS) | **Done** | MVP: echo + Claude adapters, context loader, gRPC server |
 | Factory (Go) | **Complete** | sandbox, orchestrator, delivery, workspace, CLI wiring |
 | Docs suite | **Done** | `docs/design.md`, `docs/prd-forge.md`, `references/references.md` |
+| Integration (L4) | **Complete** | CI, README, deterministic smoke tests, doc reconciliation |
 
 ---
 
