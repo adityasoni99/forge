@@ -3,6 +3,7 @@ package blueprint
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -115,13 +116,13 @@ func TestEvalNodeBuildEvalPrompt(t *testing.T) {
 	if prompt == "" {
 		t.Fatal("prompt should not be empty")
 	}
-	if !containsSubstring(prompt, "Rate the code") {
+	if !strings.Contains(prompt, "Rate the code") {
 		t.Error("prompt should contain base prompt")
 	}
-	if !containsSubstring(prompt, "correctness") {
+	if !strings.Contains(prompt, "correctness") {
 		t.Error("prompt should contain criteria")
 	}
-	if !containsSubstring(prompt, "0.0 and 1.0") {
+	if !strings.Contains(prompt, "0.0 and 1.0") {
 		t.Error("prompt should instruct score format")
 	}
 }
@@ -152,15 +153,3 @@ func TestParseEvalScore(t *testing.T) {
 	}
 }
 
-func containsSubstring(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsHelper(s, sub))
-}
-
-func containsHelper(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
-}

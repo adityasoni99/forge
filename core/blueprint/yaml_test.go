@@ -598,6 +598,29 @@ edges: []
 	}
 }
 
+func TestBuildGraphEvalNodeInvalidThreshold(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: e
+nodes:
+  e:
+    type: eval
+    config:
+      prompt: "Check it"
+      threshold: 1.5
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for eval node with threshold > 1.0")
+	}
+}
+
 func TestBuildGraphEvalNodeDefaultThreshold(t *testing.T) {
 	yamlData := `
 name: t

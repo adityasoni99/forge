@@ -10,6 +10,10 @@ export default defineConfig({
         'src/context/loader.ts',
         'src/adapters/echo.ts',
         'src/adapters/claude-code.ts',
+        'src/skills/types.ts',
+        'src/skills/registry.ts',
+        'src/skills/resolver.ts',
+        'src/skills/lifecycle.ts',
       ],
       thresholds: {
         lines: 90,

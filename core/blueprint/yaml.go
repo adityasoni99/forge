@@ -164,6 +164,9 @@ func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
 		}
 		threshold := 0.7
 		if t, ok := ny.Config["threshold"].(float64); ok {
+			if t < 0 || t > 1 {
+				return nil, fmt.Errorf("eval node threshold must be between 0.0 and 1.0, got %v", t)
+			}
 			threshold = t
 		}
 		return NewEvalNode(id, prompt, criteria, threshold, executor), nil

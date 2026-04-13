@@ -25,6 +25,9 @@ export interface ComparisonResult {
 }
 
 export class SkillLifecycle {
+  // Stub: checks whether expectedContains appears in the composed prompt
+  // (skill body + task input). Will be replaced with LLM-powered evaluation
+  // once the agent executor is wired through the lifecycle.
   async evaluate(skill: Skill, testCases: TestCase[]): Promise<EvalResult> {
     if (testCases.length === 0) {
       return { passed: true, passRate: 1.0, results: [] };
