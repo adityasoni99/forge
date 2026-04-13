@@ -51,6 +51,10 @@ Patterns Forge explicitly borrows or reacts to:
 | **Stripe Minions** | Blueprints as hybrid state machines; isolated execution; curated tool subsets (~15/task); multi-tier quality gates; pragmatic retry caps (e.g. two CI rounds). |
 | **OpenAI harness engineering** | `AGENTS.md` as table of contents; layered architecture; linter output as remediation; docs as system of record; hygiene agents. |
 | **Anthropic (long-running harness)** | Planner / generator / evaluator separation; **sprint contracts** before coding; skeptical external evaluator; Playwright-style QA of running apps; **context resets vs compaction** tradeoffs; simplify harness as models improve. |
+| **Anthropic (“Seeing like an agent”)** | Tool design matched to model behavior; structured outputs via tools; progressive disclosure; audit tool sets as models improve ([blog](https://claude.com/blog/seeing-like-an-agent)). |
+| **Karpathy LLM Wiki** | Persistent markdown wiki between sources and schema; **Ingest / Query / Lint**; compounding repo-local knowledge vs only RAG-at-query-time ([gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)). |
+| **Meta Harness / metaharness** | Outer loop optimizes **files + scripts + instructions** that comprise the harness, with evidence on disk (candidates, ledgers, scope limits)—parallel to eval-driven harness iteration ([repo](https://github.com/SuperagenticAI/metaharness)). |
+| **gstack** | Skill-pack “factory” with sprint pipelines, roles, and guardrails—prior art for **packaging** harness behavior as skills vs a standalone engine ([gstack](https://github.com/garrytan/gstack)). |
 | **Boris Cherny / Claude Code practice** | Plan-first workflows; **failure-to-rule** (turn corrections into durable rules); skills for repeated workflows; parallel worktrees; verification as first-class. |
 | **Everything Claude Code (ECC)** | Large skill libraries; hooks and cross-harness patterns; continuous learning and instincts; harness audit / quality commands. |
 | **Superpowers** | Brainstorming-to-implementation discipline; TDD-oriented workflows. |
@@ -63,6 +67,7 @@ Patterns Forge explicitly borrows or reacts to:
 | **cc-connect** | Messaging bridges (Slack, Discord, Telegram, etc.) as trigger surfaces. |
 | **Tessl / eval-driven skills** | Skills as versioned artifacts with evaluation lifecycle. |
 | **IBM-style finding (cited in planning)** | Combine LLM judgment with **deterministic** checks for high catch rates—Forge encodes this as gates + linters/tests. |
+| **Archon** | YAML workflow engine with deterministic + agent nodes, loop/gate nodes, validation, human approval, PR delivery; **closest open-source peer** to Forge's blueprint model. Forge differentiates via **three-layer independence**, **typed Go engine** (vs Python), and **factory-scale sandboxing** ([Archon](https://github.com/coleam00/archon)). |
 | **Claude Code (production agent)** | Role-based tool allowlists per agent role; concurrent vs serial tool batching with `isConcurrencySafe` metadata; layered permission model (deny > ask > allow with source precedence); typed hooks pipeline (27 events); coordinator as prompt composition not separate runtime; file-backed agent mailboxes for multi-agent communication; PID-based memory consolidation locks with gate ordering; structured context assembly for prompt caching; streaming tool execution. See [aicurs patterns](../references/aicurs-patterns.md). |
 
 ---
@@ -781,6 +786,7 @@ shipping; see [aicurs patterns](../references/aicurs-patterns.md).
 | **ChatDev (DevAll 2.0)** | [ChatDev](https://github.com/OpenBMB/ChatDev) provides YAML workflows and multi-agent roles. Forge differentiates with **three-layer independence** (engine, harness, factory as separable products), **agent-agnostic wrapping** (Claude Code, Goose, Codex, etc. vs ChatDev’s built-in agent stack), and **deterministic gates** as first-class quality enforcement in the graph. |
 | **PocketFlow** | [PocketFlow](https://github.com/The-Pocket/PocketFlow) is a **~100-line graph** core; see [Design Patterns](https://the-pocket.github.io/PocketFlow/design_pattern/) for named workflow idioms. Forge’s **Blueprint Engine** is a **product graph**: Stripe-style **hybrid deterministic + agentic** nodes, plus **Harness** and **Factory** layers on top. |
 | **Squad** | [Squad](https://github.com/bradygaster/squad) models **persistent agent teams** in-repo; Forge complements that pattern with a **portable execution engine** and **sandboxed factory**—teams or roles can be projected onto blueprint nodes and harness adapters. |
+| **Archon** | [Archon](https://github.com/coleam00/archon) is a **YAML workflow engine** with agent + deterministic nodes, loops, validation, and PR delivery—the **closest open-source peer**. Forge differentiates with a **typed Go engine** (vs Python), **three-layer independence** (engine, harness, factory as separable products), **factory-scale Docker sandboxing**, and a **typed gRPC bridge** between engine and harness for language-agnostic extensibility. |
 
 ---
 
