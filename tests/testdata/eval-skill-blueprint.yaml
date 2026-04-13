@@ -1,0 +1,22 @@
+name: eval-skill-test
+version: "0.1"
+description: "Tests EvalNode + skill integration"
+start: implement
+nodes:
+  implement:
+    type: agentic
+    config:
+      prompt: "Implement the requested feature"
+      skill: "auto"
+  evaluate:
+    type: eval
+    config:
+      prompt: "Evaluate the implementation quality"
+      criteria:
+        - correctness
+        - test coverage
+        - code style
+      threshold: 0.7
+edges:
+  - from: implement
+    to: evaluate

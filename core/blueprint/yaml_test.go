@@ -623,3 +623,38 @@ edges: []
 		t.Fatal("node 'e' not found")
 	}
 }
+
+func TestBuiltinEvalSkillBlueprintValid(t *testing.T) {
+	data, err := os.ReadFile("../../tests/testdata/eval-skill-blueprint.yaml")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	bp, err := ParseBlueprintYAML(data)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	executor := &mockExecutor{output: "0.9"}
+	g, err := bp.BuildGraph(executor)
+	if err != nil {
+		t.Fatalf("build graph: %v", err)
+	}
+	if err := g.Validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	evalNode, ok := g.GetNode("evaluate")
+	if !ok {
+		t.Fatal("evaluate node not found")
+	}
+	if evalNode.Type() != NodeTypeEval {
+		t.Errorf("evaluate type = %v, want Eval", evalNode.Type())
+	}
+
+	implNode, ok := g.GetNode("implement")
+	if !ok {
+		t.Fatal("implement node not found")
+	}
+	if implNode.Type() != NodeTypeAgentic {
+		t.Errorf("implement type = %v, want Agentic", implNode.Type())
+	}
+}
