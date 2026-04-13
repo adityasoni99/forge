@@ -3,7 +3,7 @@
 > **Purpose:** Single checkpoint file for tracking what's done, what's next, and
 > where to resume. Reference this at the start of every new chat session.
 >
-> **Last updated:** 2026-04-12
+> **Last updated:** 2026-04-13
 
 ---
 
@@ -12,7 +12,7 @@
 | Version | Theme | Status |
 |---------|-------|--------|
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
-| **v0.2** | Skills, memory, parallel runs, Slack trigger | Planned |
+| **v0.2** | Skills, tool pool, triggers, parallel runs | **In progress** |
 | **v0.3** | Multi-adapter, warm pools, learning loops | Planned |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
@@ -98,24 +98,47 @@
 
 ---
 
-## v0.2 — Skills + Triggers (planned)
+## v0.2 — Skills + Tool Pool + Triggers (in progress)
 
-Planned extensions documented in Layer 2/3 plan post-MVP sections:
+**Design spec:** `docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md`
 
-| Feature | Layer | Source |
-|---------|-------|--------|
-| Skill registry (`harness/src/skills/registry.ts`) | 2 | Layer 2 plan § Post-MVP |
-| Skill resolver (task-to-skill matching) | 2 | Layer 2 plan § Post-MVP |
-| Eval-driven skill lifecycle (create → eval → improve → publish) | 2 | Layer 2 plan § Post-MVP |
-| Skill quality signals (pass rate, token efficiency) | 2 | Layer 2 plan § Post-MVP (OpenSpace) |
-| Tool pool assembly + deferred loading | 2 | Layer 2 plan § Post-MVP |
-| Tool lifecycle hooks (pre/post) | 2 | Layer 2 plan § Post-MVP |
-| Subagent context isolation | 2 | Layer 2 plan § Post-MVP |
-| EvalNode (evaluator agent in blueprints) | 1 | Master plan |
-| Slack trigger | 3 | Master plan |
-| Parallel runs (multi-container orchestration) | 3 | Master plan |
-| Task assignment queue + runtime registry | 3 | Layer 3 plan § Post-MVP (Multica) |
-| YAML vocabulary alignment (gitagent `depends_on`) | 1 | Layer 2 plan § Post-MVP (gitagent) |
+Delivery order: Sub-plan A → Sub-plan B → Sub-plan C
+
+### Sub-plan A: Skills + EvalNode (Layer 1 + 2)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Add NodeTypeEval to engine type system | Not started |
+| 2 | EvalNode struct and execution logic | Not started |
+| 3 | Eval node YAML parsing | Not started |
+| 4 | Skill types and frontmatter parser (TS) | Not started |
+| 5 | Skill registry (filesystem scan) | Not started |
+| 6 | Skill resolver (keyword matching) | Not started |
+| 7 | Skill lifecycle (evaluate, promote, compare) | Not started |
+| 8 | Integrate skills into AgentService | Not started |
+| 9 | Built-in skills + end-to-end YAML test | Not started |
+
+### Sub-plan B: Tool Pool + Context (Layer 2 + 1)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Tool types (TS) | Not started |
+| 2 | Tool pool assembly (pure function) | Not started |
+| 3 | Deferred tool loading (context budget) | Not started |
+| 4 | Tool lifecycle hooks (pre/post) | Not started |
+| 5 | Subagent context isolation | Not started |
+| 6 | YAML `depends_on` vocabulary alignment | Not started |
+
+### Sub-plan C: Triggers + Parallel (Layer 3)
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | RunRegistry (in-memory run tracking) | Not started |
+| 2 | RunQueue (bounded concurrency) | Not started |
+| 3 | TaskAssigner (rule-based adapter selection) | Not started |
+| 4 | Webhook HTTP handler | Not started |
+| 5 | forged daemon entrypoint | Not started |
+| 6 | Integration smoke test | Not started |
 
 ---
 
@@ -157,8 +180,13 @@ Planned extensions documented in Layer 2/3 plan post-MVP sections:
 | Layer 2: Harness MVP | `layer_2_harness_mvp_07ee3081` | 2 | **Complete** |
 | Layer 3: Factory MVP | `layer_3_factory_mvp_f6c28aa0` | 3 | **Complete** |
 | Layer 4: Integration + Polish | `2026-04-12-layer-4-integration-polish` | 1–3 | **Complete** |
+| v0.2 Design Spec | `2026-04-13-v02-skills-tools-triggers-design` | All | Reference doc |
+| v0.2 Sub-plan A: Skills + EvalNode | `2026-04-13-subplan-a-skills-evalnode` | 1–2 | Not started |
+| v0.2 Sub-plan B: Tool Pool + Context | `2026-04-13-subplan-b-toolpool-context` | 1–2 | Not started |
+| v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | 3 | Not started |
 
-All plan files: `.cursor/plans/*.plan.md`
+v0.1 plans: `.cursor/plans/*.plan.md`
+v0.2 plans: `docs/superpowers/plans/2026-04-13-subplan-*.md`
 
 ---
 
@@ -183,5 +211,5 @@ All plan files: `.cursor/plans/*.plan.md`
 4. Reference `project.md` for module map and `docs/design.md` for architecture.
 5. Begin implementing task-by-task per the plan's instructions.
 
-**Current checkpoint:** Layers 1–4 complete (v0.1 MVP). **Next action:** Start v0.2
-planning (skills, tool pool assembly, EvalNode, Slack trigger, parallel runs).
+**Current checkpoint:** v0.1 MVP complete. v0.2 design spec + 3 sub-plans written.
+**Next action:** Execute Sub-plan A (Skills + EvalNode) using subagent-driven development.
