@@ -48,12 +48,14 @@ func printUsage() {
 
 func cmdForgeRun(args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
-	blueprintName := fs.String("blueprint", "standard-implementation", "Blueprint name or file")
+	blueprintName := fs.String("blueprint", "standard-implementation", "Built-in blueprint name")
+	blueprintFile := fs.String("blueprint-file", "", "Path to blueprint YAML file")
 	noSandbox := fs.Bool("no-sandbox", false, "Run without Docker sandbox")
 	noPR := fs.Bool("no-pr", false, "Skip PR creation")
 	adapter := fs.String("adapter", "echo", "Agent adapter (echo, claude)")
 	image := fs.String("image", "forge:latest", "Docker image for sandbox")
 	baseBranch := fs.String("base-branch", "main", "Base branch for PR")
+	harnessAddr := fs.String("harness", "", "Harness gRPC address for local runs")
 	fs.Parse(args)
 
 	task := strings.Join(fs.Args(), " ")
@@ -62,8 +64,24 @@ func cmdForgeRun(args []string) {
 		os.Exit(1)
 	}
 
+	if *blueprintFile != "" {
+		if *blueprintName != "standard-implementation" {
+			fmt.Fprintln(os.Stderr, "use either --blueprint or --blueprint-file, not both")
+			os.Exit(1)
+		}
+		*blueprintName = ""
+	}
+
 	if *noSandbox {
-		fmt.Println("Running locally (no sandbox)...")
+		if *adapter == "claude" && *harnessAddr == "" {
+			fmt.Fprintln(os.Stderr, "--harness is required for --no-sandbox with --adapter claude")
+			os.Exit(1)
+		}
+		builtin := ""
+		if *blueprintFile == "" {
+			builtin = *blueprintName
+		}
+		cmdRun(*blueprintFile, builtin, task, *harnessAddr)
 		return
 	}
 
@@ -78,6 +96,7 @@ func cmdForgeRun(args []string) {
 	req := orchestrator.RunRequest{
 		Task:          task,
 		BlueprintName: *blueprintName,
+		BlueprintFile: *blueprintFile,
 		RepoDir:       cwd,
 		Adapter:       *adapter,
 		Image:         *image,
@@ -85,7 +104,11 @@ func cmdForgeRun(args []string) {
 		BaseBranch:    *baseBranch,
 	}
 
-	fmt.Printf("Forge run: %q (blueprint=%s, image=%s)\n", task, *blueprintName, *image)
+	source := *blueprintName
+	if *blueprintFile != "" {
+		source = *blueprintFile
+	}
+	fmt.Printf("Forge run: %q (blueprint=%s, image=%s)\n", task, source, *image)
 	result, err := pipeline.Execute(context.Background(), req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "pipeline error: %v\n", err)

@@ -301,3 +301,25 @@ func TestBuildSandboxCommandMinimal(t *testing.T) {
 		t.Errorf("expected 0 args for empty request, got %d: %v", len(args), args)
 	}
 }
+
+func TestBuildSandboxCommandBlueprintFileOnly(t *testing.T) {
+	req := RunRequest{
+		BlueprintFile: "tests/testdata/integration-smoke.yaml",
+		Task:          "smoke task",
+		Adapter:       "echo",
+	}
+	args := buildSandboxCommand(req)
+	want := []string{
+		"--blueprint-file", "tests/testdata/integration-smoke.yaml",
+		"--task", "smoke task",
+		"--adapter", "echo",
+	}
+	if len(args) != len(want) {
+		t.Fatalf("expected %d args, got %d: %v", len(want), len(args), args)
+	}
+	for i, w := range want {
+		if args[i] != w {
+			t.Errorf("args[%d] = %q, want %q", i, args[i], w)
+		}
+	}
+}

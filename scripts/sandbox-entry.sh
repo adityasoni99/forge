@@ -30,15 +30,18 @@ done
 
 cd /workspace
 
-RUN_ARGS="blueprint run"
+RUN_ARGS=(blueprint run)
 if [ -n "$BLUEPRINT_FILE" ]; then
-  RUN_ARGS="$RUN_ARGS $BLUEPRINT_FILE"
+  RUN_ARGS+=("$BLUEPRINT_FILE")
 elif [ -n "$BLUEPRINT" ]; then
-  RUN_ARGS="$RUN_ARGS --builtin $BLUEPRINT"
+  RUN_ARGS+=(--builtin "$BLUEPRINT")
 fi
-RUN_ARGS="$RUN_ARGS --harness localhost:$HARNESS_PORT"
+if [ -n "$TASK" ]; then
+  RUN_ARGS+=(--task "$TASK")
+fi
+RUN_ARGS+=(--harness "localhost:$HARNESS_PORT")
 
-forge $RUN_ARGS
+forge "${RUN_ARGS[@]}"
 EXIT_CODE=$?
 
 kill "$HARNESS_PID" 2>/dev/null || true

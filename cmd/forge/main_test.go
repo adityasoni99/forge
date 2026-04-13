@@ -99,6 +99,17 @@ func TestResolveBlueprintDataBuiltinTemplate(t *testing.T) {
 	}
 }
 
+func TestForgeRunNoSandboxRequiresHarnessForClaude(t *testing.T) {
+	cmd := forgeCmd(t, "run", "--no-sandbox", "--adapter", "claude", "ship Layer 4")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected failure, got success: %s", out)
+	}
+	if !strings.Contains(string(out), "--harness is required") {
+		t.Fatalf("expected harness guidance, got: %s", out)
+	}
+}
+
 func TestCLINoArgs(t *testing.T) {
 	cmd := forgeCmd(t)
 	out, err := cmd.CombinedOutput()
