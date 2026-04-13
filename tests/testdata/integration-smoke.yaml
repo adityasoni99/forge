@@ -1,0 +1,16 @@
+name: integration-smoke
+version: "0.1"
+description: "Deterministic smoke blueprint for Layer 4 integration tests"
+start: create_file
+nodes:
+  create_file:
+    type: deterministic
+    config:
+      command: "printf 'smoke-ok\\n' > smoke.txt"
+  verify_file:
+    type: deterministic
+    config:
+      command: "test -f smoke.txt && grep -q 'smoke-ok' smoke.txt"
+edges:
+  - from: create_file
+    to: verify_file
