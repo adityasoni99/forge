@@ -87,8 +87,10 @@
 
 ### Layer 4: Integration + Polish — COMPLETE
 
-| Task | Plan file | Status |
-|------|-----------|--------|
+**Plan:** [`docs/superpowers/plans/2026-04-12-layer-4-integration-polish.md`](docs/superpowers/plans/2026-04-12-layer-4-integration-polish.md) — all steps checked off in the plan doc.
+
+| Task | Plan ID | Status |
+|------|---------|--------|
 | Blueprint source resolution + task templating | `2026-04-12-layer-4-integration-polish` | Done |
 | Align forge run, local mode, Docker entrypoint | same | Done |
 | Deterministic smoke path for integration tests | same | Done |
@@ -100,11 +102,13 @@
 
 ## v0.2 — Skills + Tool Pool + Triggers (in progress)
 
-**Design spec:** `docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md`
+**Design spec:** [`docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md`](docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md)
 
-Delivery order: Sub-plan A → Sub-plan B → Sub-plan C
+Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **Implementation plans are written** (see paths below); execution is pending.
 
 ### Sub-plan A: Skills + EvalNode (Layer 1 + 2)
+
+**Plan:** [`docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md`](docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md)
 
 | # | Task | Status |
 |---|------|--------|
@@ -120,6 +124,8 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C
 
 ### Sub-plan B: Tool Pool + Context (Layer 2 + 1)
 
+**Plan:** [`docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md`](docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md)
+
 | # | Task | Status |
 |---|------|--------|
 | 1 | Tool types (TS) | Not started |
@@ -130,6 +136,8 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C
 | 6 | YAML `depends_on` vocabulary alignment | Not started |
 
 ### Sub-plan C: Triggers + Parallel (Layer 3)
+
+**Plan:** [`docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md`](docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md)
 
 | # | Task | Status |
 |---|------|--------|
@@ -173,20 +181,20 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C
 
 ## Plan file index
 
-| Plan | ID | Layer | Status |
-|------|----|-------|--------|
-| Forge Agent Factory (master) | `forge_agent_factory_86e877d4` | All | Reference doc |
-| Layer 1: Blueprint Engine | `layer_1_blueprint_engine_4bd3f740` | 1 | **Complete** |
-| Layer 2: Harness MVP | `layer_2_harness_mvp_07ee3081` | 2 | **Complete** |
-| Layer 3: Factory MVP | `layer_3_factory_mvp_f6c28aa0` | 3 | **Complete** |
-| Layer 4: Integration + Polish | `2026-04-12-layer-4-integration-polish` | 1–3 | **Complete** |
-| v0.2 Design Spec | `2026-04-13-v02-skills-tools-triggers-design` | All | Reference doc |
-| v0.2 Sub-plan A: Skills + EvalNode | `2026-04-13-subplan-a-skills-evalnode` | 1–2 | Not started |
-| v0.2 Sub-plan B: Tool Pool + Context | `2026-04-13-subplan-b-toolpool-context` | 1–2 | Not started |
-| v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | 3 | Not started |
+| Plan | ID | Path | Layer | Status |
+|------|----|------|-------|--------|
+| Forge Agent Factory (master) | `forge_agent_factory_86e877d4` | `.cursor/plans/forge_agent_factory_86e877d4.plan.md` | All | Reference doc |
+| Layer 1: Blueprint Engine | `layer_1_blueprint_engine_4bd3f740` | `.cursor/plans/layer_1_blueprint_engine_4bd3f740.plan.md` | 1 | **Complete** |
+| Layer 2: Harness MVP | `layer_2_harness_mvp_07ee3081` | `.cursor/plans/layer_2_harness_mvp_07ee3081.plan.md` | 2 | **Complete** |
+| Layer 3: Factory MVP | `layer_3_factory_mvp_f6c28aa0` | `.cursor/plans/layer_3_factory_mvp_f6c28aa0.plan.md` | 3 | **Complete** |
+| Layer 4: Integration + Polish | `2026-04-12-layer-4-integration-polish` | `docs/superpowers/plans/2026-04-12-layer-4-integration-polish.md` | 1–3 | **Complete** |
+| v0.2 Design Spec | `2026-04-13-v02-skills-tools-triggers-design` | `docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md` | All | Reference doc |
+| v0.2 Sub-plan A: Skills + EvalNode | `2026-04-13-subplan-a-skills-evalnode` | `docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md` | 1–2 | **Planned** (execute next) |
+| v0.2 Sub-plan B: Tool Pool + Context | `2026-04-13-subplan-b-toolpool-context` | `docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md` | 1–2 | **Planned** (after A) |
+| v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | `docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md` | 3 | **Planned** (after A) |
 
-v0.1 plans: `.cursor/plans/*.plan.md`
-v0.2 plans: `docs/superpowers/plans/2026-04-13-subplan-*.md`
+v0.1 layer plans: `.cursor/plans/*.plan.md`
+v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 
 ---
 
@@ -206,10 +214,10 @@ v0.2 plans: `docs/superpowers/plans/2026-04-13-subplan-*.md`
 ## How to resume
 
 1. Open this file at the start of a new chat.
-2. Find the **first "Not started"** task in the current version (v0.1).
-3. Open the corresponding plan file (`.cursor/plans/<id>.plan.md`).
+2. For **v0.2 work**, find the first **Not started** row under Sub-plan A/B/C above, then open that sub-plan file under `docs/superpowers/plans/`.
+3. For historical **v0.1 layer plans**, use `.cursor/plans/<id>.plan.md` from the index table.
 4. Reference `project.md` for module map and `docs/design.md` for architecture.
-5. Begin implementing task-by-task per the plan's instructions.
+5. Implement task-by-task per the plan (subagent-driven development recommended for v0.2 plans).
 
-**Current checkpoint:** v0.1 MVP complete. v0.2 design spec + 3 sub-plans written.
-**Next action:** Execute Sub-plan A (Skills + EvalNode) using subagent-driven development.
+**Current checkpoint:** v0.1 MVP complete (including Layer 4 — plan doc marked complete). v0.2 design spec + three sub-plan documents are ready.
+**Next action:** Execute Sub-plan A ([`2026-04-13-subplan-a-skills-evalnode.md`](docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md)) task-by-task.
