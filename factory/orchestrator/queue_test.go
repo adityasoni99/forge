@@ -54,9 +54,6 @@ func TestRunQueueEnqueueAndProcess(t *testing.T) {
 
 func TestRunQueueConcurrencyLimit(t *testing.T) {
 	reg := NewRunRegistry()
-	var maxConcurrent atomic.Int32
-	var current atomic.Int32
-
 	pipe := &mockPipeline{delay: 50 * time.Millisecond}
 	q := NewRunQueue(reg, pipe, 2)
 
@@ -77,8 +74,6 @@ func TestRunQueueConcurrencyLimit(t *testing.T) {
 	if pipe.callCount.Load() != 5 {
 		t.Errorf("callCount = %d, want 5", pipe.callCount.Load())
 	}
-	_ = maxConcurrent
-	_ = current
 }
 
 func TestRunQueueContextCancellation(t *testing.T) {
