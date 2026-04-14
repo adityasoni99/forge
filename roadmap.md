@@ -176,6 +176,8 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 | RunQueue drain/wait API for graceful shutdown | 3 | v0.2 Sub-plan C limitation |
 | Webhook `repo_url` → worktree clone resolution | 3 | v0.2 Sub-plan C limitation |
 | Wire TaskAssigner into pipeline/daemon | 3 | v0.2 Sub-plan C limitation |
+| Human/approval node in blueprint engine | 1 | Archon, design.md §4.2 |
+| Shell output compression at tool boundary | 2 | rtk (rtk-ai/rtk) |
 
 ---
 
@@ -186,10 +188,20 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 | Built-in skills (planning, coding, quality, context) | 2 | Master plan |
 | Full documentation suite | — | Master plan |
 | Community skill marketplace | 2 | OpenSpace prior art |
-| Webhook + GitHub Issues triggers | 3 | Master plan |
+| Webhook + GitHub Issues + Slack/Discord triggers | 3 | Master plan, Archon, cc-connect |
 | Human review queue + auto-merge policies | 3 | Master plan |
 | Run tracing + token analytics dashboard | 3 | Master plan |
 | Daemon mode (`forged`) production hardening | 3 | Master plan |
+| Durable run store (Postgres) replacing in-memory registry | 3 | Multica |
+| WebSocket/SSE live run progress streaming | 3 | Multica |
+| Web UI for workflow management and monitoring | 3 | Archon, PentAGI |
+| Pluggable observability backends (Grafana, Langfuse) | 3 | PentAGI |
+| Repository code intelligence graph (AST + deps) | 2 | graphify, code-review-graph |
+| Self-evolving skills from usage telemetry | 2 | OpenSpace |
+| MCP-native skill packaging and distribution | 2 | OpenSpace |
+| Portable agent project manifest (import/export) | All | gitagent |
+| Outer-loop harness optimization (versioned candidates) | 2 | metaharness |
+| RL / prompt-policy optimization (experimental) | 2 | Agent Lightning |
 
 ---
 
