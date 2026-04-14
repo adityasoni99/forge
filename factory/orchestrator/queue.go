@@ -1,0 +1,111 @@
+package orchestrator
+
+import (
+	"context"
+	"sync"
+)
+
+const defaultQueueBuffer = 100
+
+// PipelineExecutor abstracts Pipeline.Execute for testability.
+type PipelineExecutor interface {
+	Execute(ctx context.Context, req RunRequest) (RunResult, error)
+}
+
+type queueItem struct {
+	runID string
+	req   RunRequest
+}
+
+// RunQueue provides bounded-concurrency pipeline execution.
+type RunQueue struct {
+	registry    *RunRegistry
+	pipeline    PipelineExecutor
+	maxParallel int
+	items       chan queueItem
+	done        map[string]chan struct{}
+	mu          sync.Mutex
+}
+
+// NewRunQueue constructs a queue with at least one worker slot.
+// maxParallel is the maximum number of pipeline executions that may run
+// concurrently; values below 1 are treated as 1.
+func NewRunQueue(registry *RunRegistry, pipeline PipelineExecutor, maxParallel int) *RunQueue {
+	if maxParallel < 1 {
+		maxParallel = 1
+	}
+	return &RunQueue{
+		registry:    registry,
+		pipeline:    pipeline,
+		maxParallel: maxParallel,
+		items:       make(chan queueItem, defaultQueueBuffer),
+		done:        make(map[string]chan struct{}),
+	}
+}
+
+// Enqueue adds a run request and returns its ID immediately.
+// It blocks if the internal buffer is full until space is available.
+func (q *RunQueue) Enqueue(req RunRequest) string {
+	runID := "run-" + generateRunID()
+	q.registry.Register(runID)
+
+	q.mu.Lock()
+	q.done[runID] = make(chan struct{})
+	q.mu.Unlock()
+
+	q.items <- queueItem{runID: runID, req: req}
+	return runID
+}
+
+// Start consumes the queue with up to maxParallel workers. It must run for the
+// lifetime of the queue. Enqueue blocks if the internal buffer is full.
+// Cancelling ctx stops accepting new work; in-flight items complete.
+func (q *RunQueue) Start(ctx context.Context) {
+	sem := make(chan struct{}, q.maxParallel)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case item := <-q.items:
+			sem <- struct{}{}
+			go func(it queueItem) {
+				defer func() { <-sem }()
+				q.process(ctx, it)
+			}(item)
+		}
+	}
+}
+
+// Wait blocks until the given run completes or ctx expires.
+func (q *RunQueue) Wait(ctx context.Context, runID string) error {
+	q.mu.Lock()
+	ch, ok := q.done[runID]
+	q.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	select {
+	case <-ch:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (q *RunQueue) process(ctx context.Context, item queueItem) {
+	q.registry.Update(item.runID, RunResult{RunID: item.runID, Status: RunStatusRunning})
+
+	result, err := q.pipeline.Execute(ctx, item.req)
+	if err != nil {
+		result = RunResult{RunID: item.runID, Status: RunStatusFailed, Error: err.Error()}
+	}
+	result.RunID = item.runID
+	q.registry.Update(item.runID, result)
+
+	q.mu.Lock()
+	if ch, ok := q.done[item.runID]; ok {
+		close(ch)
+		delete(q.done, item.runID)
+	}
+	q.mu.Unlock()
+}
