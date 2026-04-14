@@ -34,7 +34,7 @@
 - Create: `factory/orchestrator/registry.go`
 - Create: `factory/orchestrator/registry_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `factory/orchestrator/registry_test.go`:
 
@@ -115,12 +115,12 @@ func TestRunRegistryList(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./factory/orchestrator/ -run "TestRunRegistry" -v`
 Expected: compilation error — `NewRunRegistry` undefined
 
-- [ ] **Step 3: Implement RunRegistry**
+- [x] **Step 3: Implement RunRegistry**
 
 Create `factory/orchestrator/registry.go`:
 
@@ -175,12 +175,12 @@ func (r *RunRegistry) List() []RunResult {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./factory/orchestrator/ -run "TestRunRegistry" -v`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add factory/orchestrator/registry.go factory/orchestrator/registry_test.go
@@ -195,7 +195,7 @@ git commit -m "feat(factory): add RunRegistry for in-memory run tracking"
 - Create: `factory/orchestrator/queue.go`
 - Create: `factory/orchestrator/queue_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `factory/orchestrator/queue_test.go`:
 
@@ -300,12 +300,12 @@ func TestRunQueueContextCancellation(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./factory/orchestrator/ -run "TestRunQueue" -v`
 Expected: compilation error — `NewRunQueue` undefined
 
-- [ ] **Step 3: Implement RunQueue**
+- [x] **Step 3: Implement RunQueue**
 
 Create `factory/orchestrator/queue.go`:
 
@@ -422,12 +422,12 @@ func newRunID() string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./factory/orchestrator/ -run "TestRunQueue" -v -timeout 30s`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add factory/orchestrator/queue.go factory/orchestrator/queue_test.go
@@ -442,7 +442,7 @@ git commit -m "feat(factory): add RunQueue with bounded concurrency"
 - Create: `factory/orchestrator/assignment.go`
 - Create: `factory/orchestrator/assignment_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `factory/orchestrator/assignment_test.go`:
 
@@ -492,12 +492,12 @@ func TestTaskAssignerEmptyTask(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./factory/orchestrator/ -run "TestTaskAssigner" -v`
 Expected: compilation error — `NewTaskAssigner` undefined
 
-- [ ] **Step 3: Implement TaskAssigner**
+- [x] **Step 3: Implement TaskAssigner**
 
 Create `factory/orchestrator/assignment.go`:
 
@@ -522,12 +522,12 @@ func (a *TaskAssigner) Assign(req RunRequest) string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./factory/orchestrator/ -run "TestTaskAssigner" -v`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add factory/orchestrator/assignment.go factory/orchestrator/assignment_test.go
@@ -542,7 +542,7 @@ git commit -m "feat(factory): add TaskAssigner for adapter selection"
 - Create: `factory/triggers/webhook.go`
 - Create: `factory/triggers/webhook_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `factory/triggers/webhook_test.go`:
 
@@ -698,12 +698,12 @@ var _ Enqueuer = (*stubQueue)(nil)
 var _ StatusGetter = (*stubRegistry)(nil)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./factory/triggers/ -run "TestWebhook" -v`
 Expected: compilation error — package/types don't exist
 
-- [ ] **Step 3: Implement webhook handler**
+- [x] **Step 3: Implement webhook handler**
 
 Create `factory/triggers/webhook.go`:
 
@@ -820,12 +820,12 @@ func (h *WebhookHandler) getRunStatus(w http.ResponseWriter, runID string) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./factory/triggers/ -run "TestWebhook" -v`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add factory/triggers/webhook.go factory/triggers/webhook_test.go
@@ -839,7 +839,7 @@ git commit -m "feat(factory): add webhook HTTP handler for run triggers"
 **Files:**
 - Create: `cmd/forged/main.go`
 
-- [ ] **Step 1: Create the daemon entrypoint**
+- [x] **Step 1: Create the daemon entrypoint**
 
 Create `cmd/forged/main.go`:
 
@@ -937,12 +937,12 @@ func envOrInt(key string, fallback int) int {
 }
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run: `go build ./cmd/forged/`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add cmd/forged/main.go
@@ -956,7 +956,7 @@ git commit -m "feat(factory): add forged daemon entrypoint with webhook + queue"
 **Files:**
 - Create: `factory/triggers/integration_test.go`
 
-- [ ] **Step 1: Write integration test**
+- [x] **Step 1: Write integration test**
 
 Create `factory/triggers/integration_test.go`:
 
@@ -1046,17 +1046,17 @@ func TestIntegrationWebhookQueueRegistry(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run integration test**
+- [x] **Step 2: Run integration test**
 
 Run: `go test ./factory/triggers/ -run "TestIntegration" -v -timeout 30s`
 Expected: PASS
 
-- [ ] **Step 3: Run all factory tests**
+- [x] **Step 3: Run all factory tests**
 
 Run: `go test ./factory/... -v -timeout 60s`
 Expected: all PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add factory/triggers/integration_test.go

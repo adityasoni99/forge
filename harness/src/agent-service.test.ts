@@ -4,6 +4,7 @@ import { EchoAdapter } from './adapters/echo.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { SkillRegistry } from './skills/registry.js';
 
 describe('AgentService', () => {
   it('enriches prompt with context and calls adapter', async () => {
@@ -86,5 +87,93 @@ describe('AgentService', () => {
     });
     expect(response.success).toBe(false);
     expect(response.error).toContain('string-throw');
+  });
+
+  it('prepends skill body when skill=auto resolves', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-skill-'));
+    const skillsDir = path.join(tmpDir, 'skills', 'coding', 'implement-feature');
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'SKILL.md'), `---
+name: implement-feature
+version: "1.0"
+description: Implement features
+when_to_use: When implementing new features
+tags:
+  - coding
+  - implementation
+---
+You are an expert feature implementer.
+`);
+
+    try {
+      const registry = new SkillRegistry();
+      await registry.loadAll(path.join(tmpDir, 'skills'));
+      const service = new AgentService(new EchoAdapter(), { skillRegistry: registry });
+
+      const response = await service.executeAgent({
+        prompt: 'Implement user registration',
+        config_json: JSON.stringify({ skill: 'auto' }),
+        working_directory: tmpDir,
+        blueprint_name: 'standard',
+        node_id: 'impl',
+        run_id: 'r1',
+      });
+
+      expect(response.success).toBe(true);
+      expect(response.output).toContain('expert feature implementer');
+      expect(response.output).toContain('Implement user registration');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('prepends skill body when skill=name resolves', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-skill-'));
+    const skillsDir = path.join(tmpDir, 'skills', 'quality', 'code-review');
+    fs.mkdirSync(skillsDir, { recursive: true });
+    fs.writeFileSync(path.join(skillsDir, 'SKILL.md'), `---
+name: code-review
+version: "1.0"
+description: Review code
+when_to_use: When reviewing
+tags:
+  - review
+---
+You are an expert code reviewer.
+`);
+
+    try {
+      const registry = new SkillRegistry();
+      await registry.loadAll(path.join(tmpDir, 'skills'));
+      const service = new AgentService(new EchoAdapter(), { skillRegistry: registry });
+
+      const response = await service.executeAgent({
+        prompt: 'Check the auth module',
+        config_json: JSON.stringify({ skill: 'code-review' }),
+        working_directory: tmpDir,
+        blueprint_name: 'review',
+        node_id: 'review',
+        run_id: 'r1',
+      });
+
+      expect(response.success).toBe(true);
+      expect(response.output).toContain('expert code reviewer');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('works normally without skill registry', async () => {
+    const service = new AgentService(new EchoAdapter());
+    const response = await service.executeAgent({
+      prompt: 'Do stuff',
+      config_json: JSON.stringify({ skill: 'auto' }),
+      working_directory: '/tmp',
+      blueprint_name: 'b',
+      node_id: 'n',
+      run_id: 'r',
+    });
+    expect(response.success).toBe(true);
+    expect(response.output).toContain('Do stuff');
   });
 });

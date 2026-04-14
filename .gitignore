@@ -10,3 +10,5 @@ coverage*.out
 node_modules/
 harness/coverage/
 .worktrees/
+cover.out
+forged

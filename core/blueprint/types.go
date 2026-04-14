@@ -11,6 +11,7 @@ const (
 	NodeTypeAgentic NodeType = iota
 	NodeTypeDeterministic
 	NodeTypeGate
+	NodeTypeEval
 )
 
 func (nt NodeType) String() string {
@@ -21,6 +22,8 @@ func (nt NodeType) String() string {
 		return "deterministic"
 	case NodeTypeGate:
 		return "gate"
+	case NodeTypeEval:
+		return "eval"
 	default:
 		return "unknown"
 	}

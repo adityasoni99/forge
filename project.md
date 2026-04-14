@@ -58,7 +58,7 @@ depth is in `docs/design.md`.
 | **Layer 2** — harness, adapters, gRPC server | `harness/` (MVP: echo + Claude adapters, context loader, gRPC server) |
 | **gRPC** — contract + Go client | `proto/forge/v1/`, `internal/grpcexec/` |
 | **Layer 3** — sandbox, workspace, orchestrator, delivery | `factory/` (MVP complete) |
-| **Daemon** (planned) | `cmd/forged/` |
+| **Daemon** (skeleton implemented) | `cmd/forged/` |
 | **Built-in skills** (planned) | `skills/` |
 | **Cross-package tests** (planned) | `tests/` (repo-level) |
 | Local Cursor plans (not shipped in binary) | `.cursor/plans/*.plan.md` |
@@ -111,8 +111,8 @@ depth is in `docs/design.md`.
 | `factory/workspace` | 3 | Go | git | **Complete** |
 | `factory/orchestrator` | 3 | Go | `core/blueprint`, sandbox, workspace, delivery | **Complete** |
 | `factory/delivery` | 3 | Go | git provider APIs | **Complete** |
-| `factory/triggers` | 3 | Go | `factory/orchestrator` | **Planned** |
-| `cmd/forged` | 3 | Go | factory packages | **Planned** (daemon) |
+| `factory/triggers` | 3 | Go | `factory/orchestrator` | **Complete** (webhook HTTP handler) |
+| `cmd/forged` | 3 | Go | factory packages | **Complete** (daemon skeleton) |
 
 ---
 
@@ -147,7 +147,10 @@ depth is in `docs/design.md`.
 - **Workspace** (`factory/workspace/`): Git worktree creation and cleanup for isolated runs.
 - **Orchestrator** (`factory/orchestrator/`): Pipeline wiring workspace → sandbox → delivery with structured lifecycle events.
 - **Delivery** (`factory/delivery/`): Git push + PR creation via `gh` CLI.
-- **Triggers**: CLI (done in Layer 1 first), then Slack/webhook/GitHub (planned).
+- **Triggers** (`factory/triggers/`): Webhook HTTP handler (POST/GET `/api/v1/runs`) with `Enqueuer`/`StatusGetter` interfaces for clean DI. CLI trigger done in Layer 1; Slack/GitHub triggers planned.
+- **RunRegistry** (`factory/orchestrator/registry.go`): Concurrent-safe in-memory run state tracking.
+- **RunQueue** (`factory/orchestrator/queue.go`): Bounded-concurrency worker pool with `PipelineExecutor` interface.
+- **TaskAssigner** (`factory/orchestrator/assignment.go`): Rule-based adapter selection (v0.2 scaffolding).
 
 ---
 
@@ -209,6 +212,48 @@ destroy.
 **Path:** `git push <remote> <branch>` → if PR title set, `gh pr create` with title,
 body, head, optional base → parse PR URL from stdout.  
 **Output:** `DeliveryResult` with pushed flag, PR created flag, PR URL.
+
+### `factory/orchestrator` — RunRegistry Story
+
+**Input:** Run ID.  
+**Path:** `Register` creates a `Pending` entry in a concurrent-safe `map[string]RunResult`
+guarded by `sync.RWMutex`. `Update` replaces existing entries (no-op for unknown IDs,
+normalizes `RunID` to match key). `Get` returns current result. `List` returns all runs.  
+**Output:** Thread-safe in-memory run state lookup.
+
+### `factory/orchestrator` — RunQueue Story
+
+**Input:** `RunRequest` via `Enqueue`.  
+**Path:** Generate unique run ID → register in `RunRegistry` as Pending → send to
+buffered channel (cap 100). `Start` runs a pump loop: dequeue items, acquire semaphore
+slot (bounded by `maxParallel`), spawn worker goroutine. Worker calls
+`PipelineExecutor.Execute`, updates registry, closes per-run done channel. `Wait` blocks
+on done channel or context cancellation.  
+**Output:** Asynchronous bounded-concurrency pipeline execution with status tracking.
+
+### `factory/orchestrator` — TaskAssigner Story
+
+**Input:** `RunRequest`.  
+**Path:** If `RunRequest.Adapter` is non-empty, return it unchanged. Otherwise return
+`"claude"` as the default adapter.  
+**Output:** Adapter name string. (v0.2 placeholder; future: skill-metadata-based routing.)
+
+### `factory/triggers` — Webhook Story
+
+**Input:** HTTP request to `/api/v1/runs`.  
+**Path:** POST: decode `CreateRunRequest` JSON → validate `task` required → map to
+`orchestrator.RunRequest` → enqueue via `Enqueuer` interface → return 202 with run ID.
+GET `/:id`: lookup via `StatusGetter` interface → return 200 with status or 404.
+Other methods → 405.  
+**Output:** JSON HTTP responses. Decoupled from orchestrator via `Enqueuer`/`StatusGetter` interfaces.
+
+### `cmd/forged` — Story
+
+**Input:** CLI flags (`-port`, `-max-parallel`) and env vars (`FORGED_PORT`, `FORGED_MAX_PARALLEL`).  
+**Path:** Create `RunRegistry` → create `RunQueue` with placeholder `logPipeline` →
+start queue in background → create `WebhookHandler` → mount on HTTP mux → start
+server → wait for SIGINT/SIGTERM → graceful shutdown (cancel context, 5s HTTP drain).  
+**Output:** Running HTTP daemon on configured port accepting run requests.
 
 ---
 
@@ -308,10 +353,8 @@ forge/
 ### Planned additions (remaining)
 
 ```text
-  cmd/forged/                    # Factory daemon
   core/blueprint/compose.go      # Blueprint composition
   skills/                        # Built-in SKILL bundles
-  factory/triggers/              # Slack, webhook, cron triggers
 ```
 
 ---
@@ -324,7 +367,8 @@ forge/
 | Built-in blueprints | **Done** | `standard-implementation`, `bug-fix` |
 | CLI | **Complete** | `run`, `blueprint run/validate/list`, `--builtin`, `--task`, `--harness`, `--no-sandbox` |
 | Harness (TS) | **Done** | MVP: echo + Claude adapters, context loader, gRPC server |
-| Factory (Go) | **Complete** | sandbox, orchestrator, delivery, workspace, CLI wiring |
+| Factory (Go) | **Complete** | sandbox, orchestrator (pipeline + registry + queue + assigner), delivery, workspace, triggers (webhook), CLI wiring |
+| Daemon (`forged`) | **Skeleton** | HTTP server, webhook + queue wiring, signal handling, graceful shutdown |
 | Docs suite | **Done** | `docs/design.md`, `docs/prd-forge.md`, `references/references.md` |
 | Integration (L4) | **Complete** | CI, README, deterministic smoke tests, doc reconciliation |
 
