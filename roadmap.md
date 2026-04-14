@@ -3,7 +3,7 @@
 > **Purpose:** Single checkpoint file for tracking what's done, what's next, and
 > where to resume. Reference this at the start of every new chat session.
 >
-> **Last updated:** 2026-04-13
+> **Last updated:** 2026-04-14
 
 ---
 
@@ -12,7 +12,7 @@
 | Version | Theme | Status |
 |---------|-------|--------|
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
-| **v0.2** | Skills, tool pool, triggers, parallel runs | **In progress** |
+| **v0.2** | Skills, tool pool, triggers, parallel runs | **Complete** |
 | **v0.3** | Multi-adapter, warm pools, learning loops | Planned |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
@@ -100,11 +100,11 @@
 
 ---
 
-## v0.2 — Skills + Tool Pool + Triggers (in progress)
+## v0.2 — Skills + Tool Pool + Triggers (complete)
 
 **Design spec:** [`docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md`](docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md)
 
-Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **Sub-plans A and B are complete**; next is Sub-plan C.
+Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans are complete.** v0.2 is feature-complete.
 
 ### Sub-plan A: Skills + EvalNode (Layer 1 + 2) — **COMPLETE**
 
@@ -139,18 +139,25 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **Sub-plans A and B ar
 
 **Delivered:** `harness/src/toolshed/*` (types, pool, deferred, hooks); `harness/src/context/isolation.ts` (SubagentContext); `core/blueprint/yaml.go` `depends_on` field + edge generation. 26 new TS tests (75 total), 4 new Go tests (88 total blueprint).
 
-### Sub-plan C: Triggers + Parallel (Layer 3)
+### Sub-plan C: Triggers + Parallel (Layer 3) — **COMPLETE**
 
 **Plan:** [`docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md`](docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md)
 
 | # | Task | Status |
 |---|------|--------|
-| 1 | RunRegistry (in-memory run tracking) | Not started |
-| 2 | RunQueue (bounded concurrency) | Not started |
-| 3 | TaskAssigner (rule-based adapter selection) | Not started |
-| 4 | Webhook HTTP handler | Not started |
-| 5 | forged daemon entrypoint | Not started |
-| 6 | Integration smoke test | Not started |
+| 1 | RunRegistry (in-memory run tracking) | Done |
+| 2 | RunQueue (bounded concurrency) | Done |
+| 3 | TaskAssigner (rule-based adapter selection) | Done |
+| 4 | Webhook HTTP handler | Done |
+| 5 | forged daemon entrypoint | Done |
+| 6 | Integration smoke test | Done |
+
+**Delivered:** `factory/orchestrator/registry.go` (concurrent-safe in-memory run tracking), `queue.go` (bounded-concurrency worker pool with `PipelineExecutor` interface), `assignment.go` (rule-based adapter selection, defaults to "claude"); `factory/triggers/webhook.go` (POST/GET `/api/v1/runs` HTTP handler with `Enqueuer`/`StatusGetter` interfaces); `cmd/forged/main.go` (daemon skeleton with signal handling, graceful shutdown); integration smoke test. 32 tests total (orchestrator + triggers), all passing with `-race`.
+
+**Known limitations (documented in code, tracked for resolution in v0.3):**
+- **Daemon shutdown does not drain buffered queue items** — `RunQueue.Start` exits on context cancel; unstarted items in the 100-item buffer are lost. Fix requires a drain/wait API on `RunQueue`.
+- **`repo_url` accepted in webhook API but not mapped** — `CreateRunRequest.RepoURL` is accepted but not wired to `RunRequest.RepoDir` (URL vs local path). Resolution requires URL→worktree clone logic.
+- **`TaskAssigner` not yet wired into pipeline** — Exists as scaffolding; the webhook passes `Adapter` through directly. Wire when multi-adapter support lands.
 
 ---
 
@@ -166,6 +173,9 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **Sub-plans A and B ar
 | Full quality gate system (sprint contracts) | 2 | Master plan |
 | Prompt composition stack (5-level override) | 2 | design.md §5.3 |
 | Permission pipeline (deterministic + async) | 3 | design.md §11 |
+| RunQueue drain/wait API for graceful shutdown | 3 | v0.2 Sub-plan C limitation |
+| Webhook `repo_url` → worktree clone resolution | 3 | v0.2 Sub-plan C limitation |
+| Wire TaskAssigner into pipeline/daemon | 3 | v0.2 Sub-plan C limitation |
 
 ---
 
@@ -179,7 +189,7 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **Sub-plans A and B ar
 | Webhook + GitHub Issues triggers | 3 | Master plan |
 | Human review queue + auto-merge policies | 3 | Master plan |
 | Run tracing + token analytics dashboard | 3 | Master plan |
-| Daemon mode (`forged`) | 3 | Master plan |
+| Daemon mode (`forged`) production hardening | 3 | Master plan |
 
 ---
 
@@ -195,7 +205,7 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **Sub-plans A and B ar
 | v0.2 Design Spec | `2026-04-13-v02-skills-tools-triggers-design` | `docs/superpowers/specs/2026-04-13-v02-skills-tools-triggers-design.md` | All | Reference doc |
 | v0.2 Sub-plan A: Skills + EvalNode | `2026-04-13-subplan-a-skills-evalnode` | `docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md` | 1–2 | **Complete** |
 | v0.2 Sub-plan B: Tool Pool + Context | `2026-04-13-subplan-b-toolpool-context` | `docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md` | 1–2 | **Complete** |
-| v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | `docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md` | 3 | **Planned** (after B) |
+| v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | `docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md` | 3 | **Complete** |
 
 v0.1 layer plans: `.cursor/plans/*.plan.md`
 v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
@@ -218,10 +228,10 @@ v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 ## How to resume
 
 1. Open this file at the start of a new chat.
-2. For **v0.2 work**, find the first **Not started** row under Sub-plan B/C above, then open that sub-plan file under `docs/superpowers/plans/`.
+2. For **v0.3 planning**, review the v0.3 feature table above and create a design spec + sub-plans.
 3. For historical **v0.1 layer plans**, use `.cursor/plans/<id>.plan.md` from the index table.
-4. Reference `project.md` for module map and `docs/design.md` for architecture.
-5. Implement task-by-task per the plan (subagent-driven development recommended for v0.2 plans).
+4. For **v0.2 plans**, see `docs/superpowers/plans/2026-04-13-subplan-*.md`.
+5. Reference `project.md` for module map and `docs/design.md` for architecture.
 
-**Current checkpoint:** v0.1 MVP complete (including Layer 4). **Sub-plans A and B** are complete. v0.2 design spec + three sub-plan documents are ready.
-**Next action:** Execute Sub-plan C ([`2026-04-13-subplan-c-triggers-parallel.md`](docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md)) task-by-task.
+**Current checkpoint:** v0.1 MVP complete. **v0.2 complete** — all three sub-plans (A: Skills+EvalNode, B: Tool Pool+Context, C: Triggers+Parallel) delivered.
+**Next action:** Plan and begin v0.3 (Learning + Multi-adapter). Three known limitations from v0.2 Sub-plan C are tracked in the v0.3 table above.
