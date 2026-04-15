@@ -13,7 +13,7 @@
 |---------|-------|--------|
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
 | **v0.2** | Skills, tool pool, triggers, parallel runs | **Complete** |
-| **v0.3** | Multi-adapter, warm pools, learning loops | Planned |
+| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | Planned |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
 ---
@@ -143,8 +143,6 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 
 **Plan:** [`docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md`](docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md)
 
-**Plan:** [`docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md`](docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md)
-
 | # | Task | Status |
 |---|------|--------|
 | 1 | RunRegistry (in-memory run tracking) | Done |
@@ -180,6 +178,7 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 | Wire TaskAssigner into pipeline/daemon | 3 | v0.2 Sub-plan C limitation |
 | Human/approval node in blueprint engine | 1 | Archon, design.md §4.2 |
 | Shell output compression at tool boundary | 2 | rtk (rtk-ai/rtk) |
+| **Agent plugin system** — installable package for Cursor / Claude Code / Windsurf with short commands (`/forge run`, `/forge fix`, `/forge plan`); auto-manages harness + adapter selection | All | obra/superpowers model |
 
 ---
 
@@ -204,6 +203,7 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 | Portable agent project manifest (import/export) | All | gitagent |
 | Outer-loop harness optimization (versioned candidates) | 2 | metaharness |
 | RL / prompt-policy optimization (experimental) | 2 | Agent Lightning |
+| Plugin marketplace — community-contributed plugins, versioned distribution, one-command install across IDEs | All | obra/superpowers, OpenSpace |
 
 ---
 
