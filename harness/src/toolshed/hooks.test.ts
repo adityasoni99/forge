@@ -14,7 +14,8 @@ describe('ToolHookRegistry', () => {
     const inv: ToolInvocation = { toolName: 'read_file', args: { path: '/a.ts' } };
     const result = await registry.runPreHooks(inv);
     expect(calls).toEqual(['pre:read_file']);
-    expect(result.toolName).toBe('read_file');
+    expect(result).not.toBeNull();
+    expect(result!.toolName).toBe('read_file');
   });
 
   it('runs post-hook after tool invocation', async () => {
@@ -40,7 +41,8 @@ describe('ToolHookRegistry', () => {
 
     const inv: ToolInvocation = { toolName: 'shell', args: { command: 'ls' } };
     const result = await registry.runPreHooks(inv);
-    expect(result.args).toEqual({ command: 'ls', timeout: 30 });
+    expect(result).not.toBeNull();
+    expect(result!.args).toEqual({ command: 'ls', timeout: 30 });
   });
 
   it('pre-hook can block by returning null', async () => {
@@ -63,7 +65,8 @@ describe('ToolHookRegistry', () => {
     const inv: ToolInvocation = { toolName: 'write_file', args: {} };
     const result = await registry.runPreHooks(inv);
     expect(calls).toEqual([]);
-    expect(result.toolName).toBe('write_file');
+    expect(result).not.toBeNull();
+    expect(result!.toolName).toBe('write_file');
   });
 
   it('chains multiple pre-hooks in order', async () => {

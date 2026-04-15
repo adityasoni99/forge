@@ -35,6 +35,9 @@ func TestEngineWithHarness(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+	if _, err := exec.LookPath("npx"); err != nil {
+		t.Skip("npx not available, skipping harness integration test")
+	}
 
 	harnessCmd := exec.Command("npx", "tsx", "src/server.ts")
 	harnessCmd.Dir = "../../harness"

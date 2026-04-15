@@ -110,8 +110,6 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 
 **Plan:** [`docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md`](docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md)
 
-**Plan:** [`docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md`](docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md)
-
 | # | Task | Status |
 |---|------|--------|
 | 1 | Add NodeTypeEval to engine type system | Done |
@@ -127,8 +125,6 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 **Delivered:** `NodeTypeEval` + `EvalNode` + YAML `type: eval`; `harness/src/skills/*` (types, registry, resolver, lifecycle); `AgentService` optional skill resolution; built-in `skills/coding/implement-feature` and `skills/quality/code-review`; `tests/testdata/eval-skill-blueprint.yaml` smoke test.
 
 ### Sub-plan B: Tool Pool + Context (Layer 2 + 1) — **COMPLETE**
-
-**Plan:** [`docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md`](docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md)
 
 **Plan:** [`docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md`](docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md)
 

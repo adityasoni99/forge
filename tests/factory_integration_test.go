@@ -12,12 +12,20 @@ import (
 	"github.com/aditya-soni/forge/factory/workspace"
 )
 
+func dockerImageExists(image string) bool {
+	cmd := exec.Command("docker", "inspect", "--type=image", image)
+	return cmd.Run() == nil
+}
+
 func TestFactoryIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker not available, skipping factory integration test")
+	}
+	if !dockerImageExists("forge:latest") {
+		t.Skip("forge:latest image not built, skipping (run 'make docker-build' first)")
 	}
 
 	repoDir := t.TempDir()
@@ -54,6 +62,9 @@ func TestFactoryIntegrationSmokeBlueprint(t *testing.T) {
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker not available, skipping factory integration test")
+	}
+	if !dockerImageExists("forge:latest") {
+		t.Skip("forge:latest image not built, skipping (run 'make docker-build' first)")
 	}
 
 	repoDir := t.TempDir()

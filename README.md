@@ -139,7 +139,7 @@ Forge synthesizes proven patterns from production agent systems:
 ### Build and verify
 
 ```bash
-git clone https://github.com/aditya-soni/forge.git
+git clone https://github.com/adityasoni99/forge.git
 cd forge
 
 go test ./...

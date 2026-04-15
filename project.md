@@ -262,7 +262,7 @@ server → wait for SIGINT/SIGTERM → graceful shutdown (cancel context, 5s HTT
 1. **`core/blueprint`** — types → graph → deterministic node → gate → agentic +
    mock tests → engine → YAML → tests (**done**).
 2. **`blueprints/`** + **`embed.go`** — built-in YAML (**done**).
-3. **`cmd/forge`** — validate, list, run (**in progress**; extend per PRD).
+3. **`cmd/forge`** — validate, list, run (**done**).
 4. **`proto/` + buf + Go codegen** — agent service contract (**done**).
 5. **`harness/` TS** — server, context loader, adapters, tests (**MVP done**).
 6. **`internal/grpcexec/`** — `AgentExecutor` over gRPC (**done**).
@@ -282,30 +282,49 @@ server → wait for SIGINT/SIGTERM → graceful shutdown (cancel context, 5s HTT
 forge/
   AGENTS.md
   project.md
-  go.mod
-  go.sum
+  roadmap.md
+  README.md
+  go.mod / go.sum
   Makefile
-  cmd/forge/
+  Dockerfile
+  .github/workflows/ci.yml
+  cmd/forge/                   # CLI
+    main.go, main_test.go
+  cmd/forged/                  # Daemon (skeleton)
     main.go
-    main_test.go
-  core/blueprint/
-    types.go
-    graph.go
-    node.go
-    engine.go
-    yaml.go
+  core/blueprint/              # Layer 1 engine
+    types.go, graph.go, node.go, engine.go, yaml.go
+    engine_parallel.go, hooks.go, permissions.go
     *_test.go
-  blueprints/
-    standard-implementation.yaml
-    bug-fix.yaml
-    embed.go
+  blueprints/                  # Built-in YAML workflows
+    standard-implementation.yaml, bug-fix.yaml, embed.go
+  harness/                     # Layer 2 (TypeScript)
+    src/adapters/              # echo, claude-code
+    src/context/               # loader, isolation
+    src/skills/                # types, registry, resolver, lifecycle
+    src/toolshed/              # types, pool, deferred, hooks
+    src/agent-service.ts, src/server.ts
+  proto/forge/v1/              # gRPC contract
+    agent.proto
+  internal/grpcexec/           # Go gRPC client
+    grpc_agent_executor.go, forgev1/
+  factory/sandbox/             # Layer 3: Docker sandbox
+  factory/workspace/           # Layer 3: git worktree manager
+  factory/orchestrator/        # Layer 3: pipeline, registry, queue, assigner
+  factory/delivery/            # Layer 3: git push + PR
+  factory/triggers/            # Layer 3: webhook handler
+  skills/                      # Built-in skill bundles
+  tests/                       # Repo-level integration tests
   docs/
-    design.md
-    prd-forge.md
-    superpowers/plans/        (empty placeholder dir)
+    design.md, prd-forge.md
+    release/v0.1.md, release/v0.2.md
+    superpowers/plans/         # Implementation plans
+    superpowers/specs/         # Design specs
   references/
-    references.md
-  .cursor/plans/               (local planning docs; not runtime)
+    references.md, referlinks.md
+  scripts/
+    sandbox-entry.sh
+  .cursor/plans/               (local planning docs; not shipped)
 ```
 
 ### Target tree (full factory — from design)
