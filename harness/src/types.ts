@@ -5,6 +5,7 @@ export interface ExecuteAgentRequest {
   blueprint_name: string;
   node_id: string;
   run_id: string;
+  adapter?: string;
 }
 
 export interface ExecuteAgentResponse {

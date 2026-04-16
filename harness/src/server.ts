@@ -5,6 +5,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AgentService } from './agent-service.js';
 import { EchoAdapter } from './adapters/echo.js';
 import { ClaudeCodeAdapter } from './adapters/claude-code.js';
+import { GooseAdapter } from './adapters/goose.js';
+import { CodexAdapter } from './adapters/codex.js';
+import { CursorAdapter } from './adapters/cursor.js';
+import type { AgentAdapter } from './adapters/types.js';
 import type { ExecuteAgentRequest } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -59,11 +63,17 @@ function isInvokedDirectly(): boolean {
 
 if (isInvokedDirectly()) {
   const port = process.env.FORGE_HARNESS_PORT ?? '50051';
-  const adapterType = process.env.FORGE_ADAPTER ?? 'echo';
+  const defaultAdapter = process.env.FORGE_ADAPTER ?? 'echo';
 
-  const adapter =
-    adapterType === 'claude' ? new ClaudeCodeAdapter() : new EchoAdapter();
-  const service = new AgentService(adapter);
+  const adapters = new Map<string, AgentAdapter>([
+    ['echo', new EchoAdapter()],
+    ['claude', new ClaudeCodeAdapter()],
+    ['goose', new GooseAdapter()],
+    ['codex', new CodexAdapter()],
+    ['cursor', new CursorAdapter()],
+  ]);
+
+  const service = new AgentService(adapters, { defaultAdapter });
   const server = createServer(service);
 
   server.bindAsync(
@@ -75,7 +85,7 @@ if (isInvokedDirectly()) {
         process.exit(1);
       }
       console.log(
-        `Forge Harness listening on port ${boundPort} (adapter: ${adapterType})`,
+        `Forge Harness listening on port ${boundPort} (adapter: ${defaultAdapter})`,
       );
     },
   );

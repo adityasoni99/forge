@@ -1,10 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { AgentService } from './agent-service.js';
 import { EchoAdapter } from './adapters/echo.js';
+import type { AgentAdapter, AgentAdapterRequest, AgentCapabilities } from './adapters/types.js';
+import type { AgentEvent } from './adapters/events.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SkillRegistry } from './skills/registry.js';
+
+function mockCapabilities(): AgentCapabilities {
+  return {
+    streaming: false,
+    interrupt: false,
+    maxContextTokens: 200000,
+    supportsTools: false,
+    needsContextReset: false,
+  };
+}
 
 describe('AgentService', () => {
   it('enriches prompt with context and calls adapter', async () => {
@@ -23,7 +35,6 @@ describe('AgentService', () => {
       });
 
       expect(response.success).toBe(true);
-      // The echo adapter receives the composed prompt (with context)
       expect(response.output).toContain('Always use TDD');
       expect(response.output).toContain('Fix the auth module');
     } finally {
@@ -32,10 +43,13 @@ describe('AgentService', () => {
   });
 
   it('handles adapter failure gracefully', async () => {
-    const failAdapter = {
-      async execute() {
-        return { output: '', success: false, error: 'agent crashed' };
+    const failAdapter: AgentAdapter = {
+      name: 'mock-fail',
+      async *execute(): AsyncIterable<AgentEvent> {
+        yield { type: 'error', content: 'agent crashed' };
       },
+      getCapabilities: mockCapabilities,
+      async interrupt() {},
     };
     const service = new AgentService(failAdapter);
     const response = await service.executeAgent({
@@ -52,10 +66,13 @@ describe('AgentService', () => {
   });
 
   it('returns structured error when adapter throws', async () => {
-    const throwingAdapter = {
-      async execute() {
+    const throwingAdapter: AgentAdapter = {
+      name: 'mock-throw',
+      async *execute(): AsyncIterable<AgentEvent> {
         throw new Error('boom');
       },
+      getCapabilities: mockCapabilities,
+      async interrupt() {},
     };
     const service = new AgentService(throwingAdapter);
     const response = await service.executeAgent({
@@ -71,10 +88,13 @@ describe('AgentService', () => {
   });
 
   it('stringifies non-Error throws in catch path', async () => {
-    const throwingAdapter = {
-      async execute() {
+    const throwingAdapter: AgentAdapter = {
+      name: 'mock-string-throw',
+      async *execute(): AsyncIterable<AgentEvent> {
         throw 'string-throw';
       },
+      getCapabilities: mockCapabilities,
+      async interrupt() {},
     };
     const service = new AgentService(throwingAdapter);
     const response = await service.executeAgent({

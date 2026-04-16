@@ -15,6 +15,7 @@ message ExecuteAgentRequest {
   string blueprint_name = 4;
   string node_id = 5;
   string run_id = 6;
+  string adapter = 7;
 }
 
 message ExecuteAgentResponse {

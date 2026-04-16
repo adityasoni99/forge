@@ -29,6 +29,7 @@ type ExecuteAgentRequest struct {
 	BlueprintName    string                 `protobuf:"bytes,4,opt,name=blueprint_name,json=blueprintName,proto3" json:"blueprint_name,omitempty"`
 	NodeId           string                 `protobuf:"bytes,5,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	RunId            string                 `protobuf:"bytes,6,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Adapter          string                 `protobuf:"bytes,7,opt,name=adapter,proto3" json:"adapter,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -105,6 +106,13 @@ func (x *ExecuteAgentRequest) GetRunId() string {
 	return ""
 }
 
+func (x *ExecuteAgentRequest) GetAdapter() string {
+	if x != nil {
+		return x.Adapter
+	}
+	return ""
+}
+
 type ExecuteAgentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Output        string                 `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
@@ -169,7 +177,7 @@ var File_forge_v1_agent_proto protoreflect.FileDescriptor
 
 const file_forge_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x14forge/v1/agent.proto\x12\bforge.v1\"\xd2\x01\n" +
+	"\x14forge/v1/agent.proto\x12\bforge.v1\"\xec\x01\n" +
 	"\x13ExecuteAgentRequest\x12\x16\n" +
 	"\x06prompt\x18\x01 \x01(\tR\x06prompt\x12\x1f\n" +
 	"\vconfig_json\x18\x02 \x01(\tR\n" +
@@ -177,7 +185,8 @@ const file_forge_v1_agent_proto_rawDesc = "" +
 	"\x11working_directory\x18\x03 \x01(\tR\x10workingDirectory\x12%\n" +
 	"\x0eblueprint_name\x18\x04 \x01(\tR\rblueprintName\x12\x17\n" +
 	"\anode_id\x18\x05 \x01(\tR\x06nodeId\x12\x15\n" +
-	"\x06run_id\x18\x06 \x01(\tR\x05runId\"^\n" +
+	"\x06run_id\x18\x06 \x01(\tR\x05runId\x12\x18\n" +
+	"\aadapter\x18\a \x01(\tR\aadapter\"^\n" +
 	"\x14ExecuteAgentResponse\x12\x16\n" +
 	"\x06output\x18\x01 \x01(\tR\x06output\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x14\n" +
