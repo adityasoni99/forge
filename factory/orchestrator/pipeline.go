@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/aditya-soni/forge/factory/delivery"
@@ -34,11 +35,31 @@ type Pipeline struct {
 	sandbox   SandboxRunner
 	workspace WorkspaceCreator
 	delivery  Deliverer
+	assigner  *TaskAssigner
+	session   SessionLog
+}
+
+// PipelineOption configures optional Pipeline behavior.
+type PipelineOption func(*Pipeline)
+
+// WithTaskAssigner configures the pipeline to use the given assigner
+// to select an adapter when none is specified in the request.
+func WithTaskAssigner(a *TaskAssigner) PipelineOption {
+	return func(p *Pipeline) { p.assigner = a }
+}
+
+// WithSessionLog configures the pipeline to emit events to the given session log.
+func WithSessionLog(s SessionLog) PipelineOption {
+	return func(p *Pipeline) { p.session = s }
 }
 
 // NewPipeline constructs a Pipeline from its three dependency interfaces.
-func NewPipeline(sbx SandboxRunner, ws WorkspaceCreator, dlv Deliverer) *Pipeline {
-	return &Pipeline{sandbox: sbx, workspace: ws, delivery: dlv}
+func NewPipeline(sbx SandboxRunner, ws WorkspaceCreator, dlv Deliverer, opts ...PipelineOption) *Pipeline {
+	p := &Pipeline{sandbox: sbx, workspace: ws, delivery: dlv}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
 }
 
 // Execute runs the full forge pipeline: workspace → sandbox → delivery → cleanup.
@@ -46,6 +67,10 @@ func (p *Pipeline) Execute(ctx context.Context, req RunRequest) (RunResult, erro
 	start := time.Now()
 	runID := generateRunID()
 	result := RunResult{RunID: runID, Status: RunStatusRunning}
+
+	if p.assigner != nil {
+		req.Adapter = p.assigner.Assign(req)
+	}
 
 	ws, err := p.workspace.Create(ctx, req.RepoDir, runID)
 	if err != nil {
@@ -56,6 +81,12 @@ func (p *Pipeline) Execute(ctx context.Context, req RunRequest) (RunResult, erro
 		return result, nil
 	}
 	appendEvent(&result.Events, "workspace", "created "+ws.Branch, time.Since(start))
+	p.emitEvent(ctx, SessionEvent{
+		Timestamp: time.Now(),
+		RunID:     runID,
+		Type:      EventWorkspaceCreated,
+		Data:      map[string]interface{}{"branch": ws.Branch, "dir": ws.Dir},
+	})
 	defer func() {
 		destroyStart := time.Now()
 		_ = p.workspace.Destroy(ctx, ws)
@@ -96,6 +127,12 @@ func (p *Pipeline) Execute(ctx context.Context, req RunRequest) (RunResult, erro
 		return result, nil
 	}
 	appendEvent(&result.Events, "sandbox", "completed", sbxResult.Duration)
+	p.emitEvent(ctx, SessionEvent{
+		Timestamp: time.Now(),
+		RunID:     runID,
+		Type:      EventNodeCompleted,
+		Data:      map[string]interface{}{"exit_code": sbxResult.ExitCode},
+	})
 	result.Output = sbxResult.Output
 
 	if sbxResult.ExitCode != 0 {
@@ -123,11 +160,32 @@ func (p *Pipeline) Execute(ctx context.Context, req RunRequest) (RunResult, erro
 		}
 		appendEvent(&result.Events, "delivery", "pushed and PR", time.Since(dlvStart))
 		result.PRURL = dlvResult.PRURL
+		p.emitEvent(ctx, SessionEvent{
+			Timestamp: time.Now(),
+			RunID:     runID,
+			Type:      EventDeliveryComplete,
+			Data:      map[string]interface{}{"pr_url": dlvResult.PRURL},
+		})
 	}
 
 	result.Status = RunStatusPassed
 	result.Duration = time.Since(start)
+	p.emitEvent(ctx, SessionEvent{
+		Timestamp: time.Now(),
+		RunID:     runID,
+		Type:      EventRunComplete,
+		Data:      map[string]interface{}{"status": result.Status.String()},
+	})
 	return result, nil
+}
+
+func (p *Pipeline) emitEvent(ctx context.Context, event SessionEvent) {
+	if p.session == nil {
+		return
+	}
+	if err := p.session.Emit(ctx, event); err != nil {
+		log.Printf("session: emit %s: %v", event.Type, err)
+	}
 }
 
 func generateRunID() string {

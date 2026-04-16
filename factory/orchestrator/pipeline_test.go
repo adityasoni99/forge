@@ -32,6 +32,7 @@ func TestRunStatusString(t *testing.T) {
 
 type mockSandboxManager struct {
 	ensureCalled bool
+	lastCommand  []string
 	runResult    sandbox.SandboxResult
 	runErr       error
 }
@@ -41,7 +42,8 @@ func (m *mockSandboxManager) EnsureImage(_ context.Context, _ sandbox.SandboxCon
 	return nil
 }
 
-func (m *mockSandboxManager) Run(_ context.Context, _ sandbox.SandboxConfig, _ []string) (sandbox.SandboxResult, error) {
+func (m *mockSandboxManager) Run(_ context.Context, _ sandbox.SandboxConfig, cmd []string) (sandbox.SandboxResult, error) {
+	m.lastCommand = cmd
 	return m.runResult, m.runErr
 }
 
@@ -299,6 +301,67 @@ func TestBuildSandboxCommandMinimal(t *testing.T) {
 	args := buildSandboxCommand(RunRequest{})
 	if len(args) != 0 {
 		t.Errorf("expected 0 args for empty request, got %d: %v", len(args), args)
+	}
+}
+
+func TestPipelineUsesTaskAssigner(t *testing.T) {
+	sbx := &mockSandboxManager{runResult: sandbox.SandboxResult{ExitCode: 0, Output: "ok"}}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: "/tmp/test", Branch: "forge/run-1", RepoDir: "/repo"}}
+	dlv := &mockDeliveryManager{}
+	assigner := NewTaskAssigner()
+	p := NewPipeline(sbx, ws, dlv, WithTaskAssigner(assigner))
+
+	req := RunRequest{
+		Task:    "implement feature",
+		RepoDir: t.TempDir(),
+		NoPR:    true,
+	}
+	result, err := p.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Status != RunStatusPassed {
+		t.Errorf("Status = %v, want Passed", result.Status)
+	}
+	found := false
+	for i, arg := range sbx.lastCommand {
+		if arg == "--adapter" && i+1 < len(sbx.lastCommand) && sbx.lastCommand[i+1] == "claude" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected --adapter claude in sandbox command, got %v", sbx.lastCommand)
+	}
+}
+
+func TestPipelineEmitsSessionEvents(t *testing.T) {
+	sbx := &mockSandboxManager{runResult: sandbox.SandboxResult{ExitCode: 0, Output: "ok"}}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: "/tmp/test", Branch: "forge/run-1", RepoDir: "/repo"}}
+	dlv := &mockDeliveryManager{}
+	sessionLog := NewFileSessionLog(t.TempDir())
+	p := NewPipeline(sbx, ws, dlv, WithSessionLog(sessionLog))
+
+	result, err := p.Execute(context.Background(), RunRequest{
+		Task:    "test session",
+		RepoDir: "/repo",
+		NoPR:    true,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	events, err := sessionLog.GetEvents(context.Background(), result.RunID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("expected 3 session events, got %d", len(events))
+	}
+	wantTypes := []SessionEventType{EventWorkspaceCreated, EventNodeCompleted, EventRunComplete}
+	for i, want := range wantTypes {
+		if events[i].Type != want {
+			t.Errorf("events[%d].Type = %q, want %q", i, events[i].Type, want)
+		}
 	}
 }
 
