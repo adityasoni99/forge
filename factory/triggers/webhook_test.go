@@ -2,9 +2,12 @@ package triggers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/aditya-soni/forge/factory/orchestrator"
@@ -144,6 +147,49 @@ func TestWebhookMethodNotAllowed(t *testing.T) {
 	}
 }
 
+func TestCreateRunWithRepoURL(t *testing.T) {
+	queue := &stubQueue{runID: "run-resolved"}
+	resolver := &mockRepoResolver{path: "/tmp/resolved-repo"}
+	handler := NewWebhookHandler(queue, &stubRegistry{}, WithRepoResolver(resolver))
+
+	body := `{"task":"fix bug","repo_url":"https://github.com/example/repo"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runs", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Errorf("status = %d, want 202", rec.Code)
+	}
+	if queue.lastReq.RepoDir != "/tmp/resolved-repo" {
+		t.Errorf("RepoDir = %q, want %q", queue.lastReq.RepoDir, "/tmp/resolved-repo")
+	}
+}
+
+type mockRepoResolver struct {
+	path string
+	err  error
+}
+
+func (m *mockRepoResolver) Resolve(_ context.Context, _ string) (string, error) {
+	return m.path, m.err
+}
+
+func TestCreateRunWithRepoURLResolverError(t *testing.T) {
+	queue := &stubQueue{runID: "run-fail"}
+	resolver := &mockRepoResolver{err: fmt.Errorf("clone failed")}
+	handler := NewWebhookHandler(queue, &stubRegistry{}, WithRepoResolver(resolver))
+
+	body := `{"task":"fix bug","repo_url":"https://github.com/example/repo"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runs", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", rec.Code)
+	}
+}
+
 // Compile-time interface checks.
 var _ Enqueuer = (*stubQueue)(nil)
 var _ StatusGetter = (*stubRegistry)(nil)
+var _ RepoResolver = (*mockRepoResolver)(nil)

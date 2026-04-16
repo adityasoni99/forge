@@ -2,6 +2,7 @@ package triggers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -48,11 +49,25 @@ type RunStatusResponse struct {
 type WebhookHandler struct {
 	queue    Enqueuer
 	registry StatusGetter
+	resolver RepoResolver
+}
+
+// WebhookOption configures optional WebhookHandler behaviour.
+type WebhookOption func(*WebhookHandler)
+
+// WithRepoResolver attaches a RepoResolver that converts incoming repo_url
+// values into local paths before enqueueing a run.
+func WithRepoResolver(r RepoResolver) WebhookOption {
+	return func(h *WebhookHandler) { h.resolver = r }
 }
 
 // NewWebhookHandler creates a handler wired to the given queue and registry.
-func NewWebhookHandler(queue Enqueuer, registry StatusGetter) *WebhookHandler {
-	return &WebhookHandler{queue: queue, registry: registry}
+func NewWebhookHandler(queue Enqueuer, registry StatusGetter, opts ...WebhookOption) *WebhookHandler {
+	h := &WebhookHandler{queue: queue, registry: registry}
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
 }
 
 func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -80,8 +95,6 @@ func (h *WebhookHandler) createRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// RepoURL resolution to a local path is planned for a future task.
-	// For now, the field is accepted but not mapped.
 	req := orchestrator.RunRequest{
 		Task:          body.Task,
 		BlueprintName: body.Blueprint,
@@ -89,6 +102,16 @@ func (h *WebhookHandler) createRun(w http.ResponseWriter, r *http.Request) {
 		BaseBranch:    body.BaseBranch,
 		NoPR:          body.NoPR,
 	}
+
+	if body.RepoURL != "" && h.resolver != nil {
+		localPath, err := h.resolver.Resolve(r.Context(), body.RepoURL)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to resolve repo_url: %v", err), http.StatusBadRequest)
+			return
+		}
+		req.RepoDir = localPath
+	}
+
 	runID := h.queue.Enqueue(req)
 
 	w.Header().Set("Content-Type", "application/json")
