@@ -1,60 +1,76 @@
-import { spawn } from 'node:child_process';
-import type { AgentAdapter, AgentAdapterRequest, AgentAdapterResponse } from './types.js';
+import { spawn, type ChildProcess } from 'node:child_process';
+import type { AgentAdapter, AgentAdapterRequest, AgentCapabilities } from './types.js';
+import type { AgentEvent } from './events.js';
 
 export class ClaudeCodeAdapter implements AgentAdapter {
-	private readonly claudeBinary: string;
+  readonly name = 'claude';
+  private readonly claudeBinary: string;
+  private currentProcess: ChildProcess | null = null;
 
-	constructor(claudeBinary = 'claude') {
-		this.claudeBinary = claudeBinary;
-	}
+  constructor(claudeBinary = 'claude') {
+    this.claudeBinary = claudeBinary;
+  }
 
-	async execute(req: AgentAdapterRequest): Promise<AgentAdapterResponse> {
-		const args = ['-p', req.prompt, '--output-format', 'json'];
+  async *execute(req: AgentAdapterRequest): AsyncIterable<AgentEvent> {
+    const args = ['-p', req.prompt, '--output-format', 'json'];
+    const result = await this.runProcess(args, req.workingDirectory);
 
-		return new Promise((resolve) => {
-			const proc = spawn(this.claudeBinary, args, {
-				cwd: req.workingDirectory,
-				env: { ...process.env },
-			});
+    if (result.success) {
+      yield { type: 'done', content: result.output };
+    } else {
+      yield { type: 'error', content: result.error };
+    }
+  }
 
-			let stdout = '';
-			let stderr = '';
+  getCapabilities(): AgentCapabilities {
+    return {
+      streaming: true,
+      interrupt: true,
+      maxContextTokens: 200000,
+      supportsTools: true,
+      needsContextReset: false,
+    };
+  }
 
-			proc.stdout?.on('data', (chunk: Buffer) => {
-				stdout += chunk.toString();
-			});
-			proc.stderr?.on('data', (chunk: Buffer) => {
-				stderr += chunk.toString();
-			});
+  async interrupt(): Promise<void> {
+    if (this.currentProcess) {
+      this.currentProcess.kill('SIGTERM');
+      this.currentProcess = null;
+    }
+  }
 
-			proc.on('close', (code) => {
-				if (code !== 0) {
-					resolve({
-						output: '',
-						success: false,
-						error: `claude exited with code ${code}: ${stderr || stdout}`,
-					});
-					return;
-				}
+  private runProcess(args: string[], cwd: string): Promise<{ output: string; success: boolean; error: string }> {
+    return new Promise((resolve) => {
+      const proc = spawn(this.claudeBinary, args, {
+        cwd,
+        env: { ...process.env },
+      });
+      this.currentProcess = proc;
 
-				try {
-					const parsed = JSON.parse(stdout) as { result?: string };
-					resolve({
-						output: parsed.result ?? stdout,
-						success: true,
-					});
-				} catch {
-					resolve({ output: stdout, success: true });
-				}
-			});
+      let stdout = '';
+      let stderr = '';
 
-			proc.on('error', (err) => {
-				resolve({
-					output: '',
-					success: false,
-					error: `failed to spawn claude: ${err.message}`,
-				});
-			});
-		});
-	}
+      proc.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+      proc.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+      proc.on('close', (code) => {
+        this.currentProcess = null;
+        if (code !== 0) {
+          resolve({ output: '', success: false, error: `claude exited with code ${code}: ${stderr || stdout}` });
+          return;
+        }
+        try {
+          const parsed = JSON.parse(stdout) as { result?: string };
+          resolve({ output: parsed.result ?? stdout, success: true, error: '' });
+        } catch {
+          resolve({ output: stdout, success: true, error: '' });
+        }
+      });
+
+      proc.on('error', (err) => {
+        this.currentProcess = null;
+        resolve({ output: '', success: false, error: `failed to spawn claude: ${err.message}` });
+      });
+    });
+  }
 }
