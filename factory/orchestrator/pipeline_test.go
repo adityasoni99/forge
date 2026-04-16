@@ -365,6 +365,58 @@ func TestPipelineEmitsSessionEvents(t *testing.T) {
 	}
 }
 
+func TestSubplanAIntegration(t *testing.T) {
+	sessDir := t.TempDir()
+	sessionLog := NewFileSessionLog(sessDir)
+	registry := NewRunRegistry()
+
+	pipeline := &mockPipeline{fn: func(ctx context.Context, req RunRequest) (RunResult, error) {
+		return RunResult{Status: RunStatusPassed, Output: "done"}, nil
+	}}
+
+	queue := NewRunQueue(registry, pipeline, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	go queue.Start(ctx)
+
+	id := queue.Enqueue(RunRequest{Task: "test task"})
+	queueCtx, queueCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer queueCancel()
+	if err := queue.Wait(queueCtx, id); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+
+	result, ok := registry.Get(id)
+	if !ok {
+		t.Fatal("run not found in registry")
+	}
+	if result.Status != RunStatusPassed {
+		t.Errorf("status = %v, want passed", result.Status)
+	}
+
+	if err := sessionLog.Emit(context.Background(), SessionEvent{
+		RunID:     id,
+		Type:      EventRunComplete,
+		Timestamp: time.Now(),
+		Data:      map[string]interface{}{"status": "passed"},
+	}); err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	events, err := sessionLog.GetEvents(context.Background(), id)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 1 {
+		t.Errorf("events = %d, want 1", len(events))
+	}
+
+	cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer shutdownCancel()
+	if err := queue.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+}
+
 func TestBuildSandboxCommandBlueprintFileOnly(t *testing.T) {
 	req := RunRequest{
 		BlueprintFile: "tests/testdata/integration-smoke.yaml",
