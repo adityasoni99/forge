@@ -3,7 +3,7 @@
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Tests](https://img.shields.io/badge/tests-160%2B_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-170%2B_passing-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-91%25_Go_|_100%25_TS-brightgreen)]()
 
 **Turn any AI coding agent into an autonomous factory that ships mergeable pull requests.**
@@ -116,11 +116,12 @@ Forge synthesizes proven patterns from production agent systems:
 - Docker sandbox with volume mounts, environment injection, resource limits, and network policy
 - Git worktree manager for branch-isolated parallel runs
 - PR delivery pipeline: `git push` + `gh pr create`
-- Run queue with bounded concurrency (configurable `maxParallel` workers)
+- Run queue with bounded concurrency (configurable `maxParallel` workers) and **graceful shutdown** (`Shutdown` drains in-flight work)
 - In-memory run registry with concurrent-safe state tracking
-- Rule-based task assigner for adapter selection
-- Webhook HTTP trigger: `POST /api/v1/runs` to enqueue, `GET /api/v1/runs/:id` to poll
-- `forged` daemon with signal handling and graceful shutdown
+- Rule-based task assigner wired into the pipeline (default adapter when none specified)
+- Durable **session event log** (`SessionLog` / file JSONL) for run lifecycle events (foundation for learning loops)
+- Webhook HTTP trigger: `POST /api/v1/runs` to enqueue, `GET /api/v1/runs/:id` to poll; optional **`repo_url`** resolved to a cached bare clone via `GitRepoResolver`
+- `forged` daemon: production pipeline wiring (Docker + worktree + delivery), or **`--dry-run`** for log-only runs; flags for session log dir and repo cache (`--sessions-dir`, `--repo-cache-dir`); signal handling with queue + HTTP shutdown
 
 ---
 
@@ -203,11 +204,18 @@ go run ./cmd/forge run --no-sandbox --harness 127.0.0.1:50051 --adapter claude "
 
 ### Daemon mode (webhook-triggered)
 
-Run `forged` as a long-lived service accepting tasks via HTTP:
+Run `forged` as a long-lived service accepting tasks via HTTP. By default it runs the **full factory pipeline** (Docker sandbox, git worktree, optional PR). Use **`--dry-run`** to log tasks without Docker/git (useful for smoke tests):
 
 ```bash
 go run ./cmd/forged -port 8080 -max-parallel 4
 ```
+
+```bash
+# Log-only pipeline (no Docker/git)
+go run ./cmd/forged --dry-run -port 8080
+```
+
+Session JSONL and repo clone cache directories default to `.forge/sessions` and `.forge/repo-cache` (override with `--sessions-dir` / `FORGED_SESSIONS_DIR`, `--repo-cache-dir` / `FORGED_REPO_CACHE`).
 
 ```bash
 # Enqueue a run

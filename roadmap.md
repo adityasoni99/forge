@@ -3,7 +3,7 @@
 > **Purpose:** Single checkpoint file for tracking what's done, what's next, and
 > where to resume. Reference this at the start of every new chat session.
 >
-> **Last updated:** 2026-04-14
+> **Last updated:** 2026-04-15
 
 ---
 
@@ -13,7 +13,7 @@
 |---------|-------|--------|
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
 | **v0.2** | Skills, tool pool, triggers, parallel runs | **Complete** |
-| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | Planned |
+| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | **In progress** (Sub-plan A merged; Sub-plan B next) |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
 ---
@@ -154,14 +154,38 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 
 **Delivered:** `factory/orchestrator/registry.go` (concurrent-safe in-memory run tracking), `queue.go` (bounded-concurrency worker pool with `PipelineExecutor` interface), `assignment.go` (rule-based adapter selection, defaults to "claude"); `factory/triggers/webhook.go` (POST/GET `/api/v1/runs` HTTP handler with `Enqueuer`/`StatusGetter` interfaces); `cmd/forged/main.go` (daemon skeleton with signal handling, graceful shutdown); integration smoke test. 32 tests total (orchestrator + triggers), all passing with `-race`.
 
-**Known limitations (documented in code, tracked for resolution in v0.3):**
-- **Daemon shutdown does not drain buffered queue items** — `RunQueue.Start` exits on context cancel; unstarted items in the 100-item buffer are lost. Fix requires a drain/wait API on `RunQueue`.
-- **`repo_url` accepted in webhook API but not mapped** — `CreateRunRequest.RepoURL` is accepted but not wired to `RunRequest.RepoDir` (URL vs local path). Resolution requires URL→worktree clone logic.
-- **`TaskAssigner` not yet wired into pipeline** — Exists as scaffolding; the webhook passes `Adapter` through directly. Wire when multi-adapter support lands.
+**Historical note (v0.2):** Three limitations were listed here; **all are resolved in v0.3 Sub-plan A** (queue drain + `Shutdown`, `repo_url` → `GitRepoResolver`, `TaskAssigner` + `SessionLog` in `Pipeline` + `forged` wiring). See v0.3 section below.
 
 ---
 
-## v0.3 — Learning + Multi-adapter (planned)
+## v0.3 — Learning + Multi-adapter
+
+**Design spec:** [`docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md`](docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md)
+
+Delivery order: **A → B → (C and D in parallel) → E** (see design spec §3).
+
+### Sub-plan A: v0.2 Debt + Factory Hardening (Layer 3) — **COMPLETE**
+
+**Plan:** [`docs/superpowers/plans/2026-04-15-subplan-a-v02-debt.md`](docs/superpowers/plans/2026-04-15-subplan-a-v02-debt.md)
+
+| Deliverable | Notes |
+|---------------|--------|
+| `SessionLog` + `FileSessionLog` | Append-only JSONL per run; foundation for learning / restart recovery |
+| `RunQueue.Shutdown` | Graceful drain (WaitGroup + two-phase wait) |
+| `RepoResolver` + webhook `repo_url` | Bare-clone cache; URL validation (blocks unsafe git transports) |
+| `Pipeline` options | `WithTaskAssigner`, `WithSessionLog`; session events at pipeline phases |
+| `forged` production wiring | Real pipeline + `--dry-run`, `--sessions-dir`, `--repo-cache-dir`; queue + HTTP shutdown |
+| Integration + docs | `TestSubplanAIntegration`; Managed Agents refs in `references/` |
+
+**Branch merged to `main`:** `v0.3/subplan-a-debt-hardening` (commits through Sub-plan A completion).
+
+### Sub-plan B: Multi-Adapter + Prompt Composition (Layer 2) — **Next**
+
+**Plan:** [`docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md`](docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md)
+
+---
+
+## v0.3 — Feature backlog (remaining)
 
 | Feature | Layer | Source |
 |---------|-------|--------|
@@ -171,11 +195,8 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 | Multiple agent adapters (Goose, Codex, Cursor) | 2 | Master plan |
 | Container warm pools | 3 | Master plan |
 | Full quality gate system (sprint contracts) | 2 | Master plan |
-| Prompt composition stack (5-level override) | 2 | design.md §5.3 |
+| Prompt composition stack (5-level override) | 2 | design.md §5.3; Sub-plan B |
 | Permission pipeline (deterministic + async) | 3 | design.md §11 |
-| RunQueue drain/wait API for graceful shutdown | 3 | v0.2 Sub-plan C limitation |
-| Webhook `repo_url` → worktree clone resolution | 3 | v0.2 Sub-plan C limitation |
-| Wire TaskAssigner into pipeline/daemon | 3 | v0.2 Sub-plan C limitation |
 | Human/approval node in blueprint engine | 1 | Archon, design.md §4.2 |
 | Shell output compression at tool boundary | 2 | rtk (rtk-ai/rtk) |
 | **Agent plugin system** — installable package for Cursor / Claude Code / Windsurf with short commands (`/forge run`, `/forge fix`, `/forge plan`); auto-manages harness + adapter selection | All | obra/superpowers model |
@@ -220,6 +241,12 @@ Delivery order: Sub-plan A → Sub-plan B → Sub-plan C. **All three sub-plans 
 | v0.2 Sub-plan A: Skills + EvalNode | `2026-04-13-subplan-a-skills-evalnode` | `docs/superpowers/plans/2026-04-13-subplan-a-skills-evalnode.md` | 1–2 | **Complete** |
 | v0.2 Sub-plan B: Tool Pool + Context | `2026-04-13-subplan-b-toolpool-context` | `docs/superpowers/plans/2026-04-13-subplan-b-toolpool-context.md` | 1–2 | **Complete** |
 | v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | `docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md` | 3 | **Complete** |
+| v0.3 Design Spec | `2026-04-15-v03-learning-multiadapter-design` | `docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md` | All | Reference doc |
+| v0.3 Sub-plan A: Debt + Factory Hardening | `2026-04-15-subplan-a-v02-debt` | `docs/superpowers/plans/2026-04-15-subplan-a-v02-debt.md` | 3 | **Complete** |
+| v0.3 Sub-plan B: Multi-Adapter + Prompt | `2026-04-15-subplan-b-multiadapter-prompt` | `docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md` | 2 | **Next** |
+| v0.3 Sub-plan C: Learning Loops | `2026-04-15-subplan-c-learning-loops` | `docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md` | 2 | Planned |
+| v0.3 Sub-plan D: Quality + Permissions + Human | `2026-04-15-subplan-d-quality-permissions-human` | `docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md` | 1–3 | Planned |
+| v0.3 Sub-plan E: Warm Pools | `2026-04-15-subplan-e-warm-pools` | `docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md` | 3 | Planned |
 
 v0.1 layer plans: `.cursor/plans/*.plan.md`
 v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
@@ -245,7 +272,8 @@ v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 2. For **v0.3 planning**, review the v0.3 feature table above and create a design spec + sub-plans.
 3. For historical **v0.1 layer plans**, use `.cursor/plans/<id>.plan.md` from the index table.
 4. For **v0.2 plans**, see `docs/superpowers/plans/2026-04-13-subplan-*.md`.
-5. Reference `project.md` for module map and `docs/design.md` for architecture.
+5. For **v0.3 plans**, see `docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md` and `docs/superpowers/plans/2026-04-15-subplan-*.md`.
+6. Reference `project.md` for module map and `docs/design.md` for architecture.
 
-**Current checkpoint:** v0.1 MVP complete. **v0.2 complete** — all three sub-plans (A: Skills+EvalNode, B: Tool Pool+Context, C: Triggers+Parallel) delivered.
-**Next action:** Plan and begin v0.3 (Learning + Multi-adapter). Three known limitations from v0.2 Sub-plan C are tracked in the v0.3 table above.
+**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 Sub-plan A complete** (merged to `main`): SessionLog, queue graceful shutdown, repo resolver + webhook `repo_url`, TaskAssigner + SessionLog in pipeline, `forged` production wiring.
+**Next action:** Implement **v0.3 Sub-plan B** (Multi-Adapter + Prompt Composition, Layer 2 harness). See [`docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md`](docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md) and design spec [`docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md`](docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md) §3.
