@@ -11,31 +11,45 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aditya-soni/forge/factory/delivery"
 	"github.com/aditya-soni/forge/factory/orchestrator"
+	"github.com/aditya-soni/forge/factory/sandbox"
 	"github.com/aditya-soni/forge/factory/triggers"
+	"github.com/aditya-soni/forge/factory/workspace"
 )
 
 func main() {
 	port := flag.String("port", envOr("FORGED_PORT", "8080"), "HTTP listen port")
 	maxParallel := flag.Int("max-parallel", envOrInt("FORGED_MAX_PARALLEL", 2), "max concurrent runs")
+	dryRun := flag.Bool("dry-run", false, "use log-only pipeline (no Docker/git)")
+	sessionsDir := flag.String("sessions-dir", envOr("FORGED_SESSIONS_DIR", ".forge/sessions"), "session log directory")
+	repoCacheDir := flag.String("repo-cache-dir", envOr("FORGED_REPO_CACHE", ".forge/repo-cache"), "bare clone cache for repo_url resolution")
 	flag.Parse()
 
-	// Known limitation: On shutdown, in-flight queue workers complete using the
-	// same context that stops the queue loop. Buffered but unstarted items may
-	// be lost. A drain/wait API on RunQueue is planned for a future iteration.
-
 	registry := orchestrator.NewRunRegistry()
+	sessionLog := orchestrator.NewFileSessionLog(*sessionsDir)
 
-	// In production, this would be a real Pipeline. For the daemon skeleton,
-	// we use a placeholder that logs and returns success.
-	pipeline := &logPipeline{}
+	var pipeline orchestrator.PipelineExecutor
+	if *dryRun {
+		pipeline = &logPipeline{}
+	} else {
+		sbx := sandbox.NewDockerSandbox(nil)
+		ws := workspace.NewManager()
+		dlv := delivery.NewGitDelivery(&sandbox.ExecRunner{})
+		assigner := orchestrator.NewTaskAssigner()
+		pipeline = orchestrator.NewPipeline(sbx, ws, dlv,
+			orchestrator.WithTaskAssigner(assigner),
+			orchestrator.WithSessionLog(sessionLog),
+		)
+	}
 	queue := orchestrator.NewRunQueue(registry, pipeline, *maxParallel)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go queue.Start(ctx)
 
-	handler := triggers.NewWebhookHandler(queue, registry)
+	resolver := triggers.NewGitRepoResolver(*repoCacheDir)
+	handler := triggers.NewWebhookHandler(queue, registry, triggers.WithRepoResolver(resolver))
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/runs", handler)
 	mux.Handle("/api/v1/runs/", handler)
@@ -48,7 +62,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("forged listening on :%s (max_parallel=%d)", *port, *maxParallel)
+		log.Printf("forged listening on :%s (max_parallel=%d, dry_run=%v)", *port, *maxParallel, *dryRun)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v", err)
 		}
@@ -60,20 +74,25 @@ func main() {
 	log.Println("shutting down...")
 	cancel()
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("shutdown: %v", err)
+
+	if err := queue.Shutdown(shutdownCtx); err != nil {
+		log.Printf("queue shutdown: %v", err)
 	}
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown: %v", err)
+	}
+	log.Println("shutdown complete")
 }
 
 type logPipeline struct{}
 
 func (p *logPipeline) Execute(_ context.Context, req orchestrator.RunRequest) (orchestrator.RunResult, error) {
-	log.Printf("executing: task=%q blueprint=%q adapter=%q", req.Task, req.BlueprintName, req.Adapter)
+	log.Printf("dry-run: task=%q blueprint=%q adapter=%q", req.Task, req.BlueprintName, req.Adapter)
 	return orchestrator.RunResult{
 		Status: orchestrator.RunStatusPassed,
-		Output: fmt.Sprintf("executed task: %s", req.Task),
+		Output: fmt.Sprintf("dry-run: %s", req.Task),
 	}, nil
 }
 
