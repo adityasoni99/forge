@@ -39,6 +39,8 @@ The former inbox file `references/newlinks.md` was folded into this audit and re
 | https://github.com/rtk-ai/rtk | § Design patterns (shell output compression for context efficiency) |
 | https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f | § Memory, context (LLM Wiki: Ingest / Query / Lint) |
 | https://claude.com/blog/seeing-like-an-agent | § Harness engineering theory (tool design, progressive disclosure) |
+| https://www.anthropic.com/engineering/managed-agents | § Harness engineering theory (brain-hands-session decoupling, containers as cattle) |
+| https://platform.claude.com/docs/en/managed-agents/overview | § Harness engineering theory (Managed Agents platform docs) |
 | https://github.com/SuperagenticAI/metaharness | § Harness engineering theory (optimize executable harness + ledgers) |
 | https://github.com/garrytan/gstack | § Multi-agent orchestration (skill-pack software factory) |
 | https://github.com/eugeniughelbur/obsidian-second-brain | § Memory, context (Karpathy-style vault skills) |
