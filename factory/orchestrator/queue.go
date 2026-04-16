@@ -25,6 +25,8 @@ type RunQueue struct {
 	items       chan queueItem
 	done        map[string]chan struct{}
 	mu          sync.Mutex
+	wg          sync.WaitGroup
+	stopped     chan struct{}
 }
 
 // NewRunQueue constructs a queue with at least one worker slot.
@@ -40,6 +42,7 @@ func NewRunQueue(registry *RunRegistry, pipeline PipelineExecutor, maxParallel i
 		maxParallel: maxParallel,
 		items:       make(chan queueItem, defaultQueueBuffer),
 		done:        make(map[string]chan struct{}),
+		stopped:     make(chan struct{}),
 	}
 }
 
@@ -59,8 +62,10 @@ func (q *RunQueue) Enqueue(req RunRequest) string {
 
 // Start consumes the queue with up to maxParallel workers. It must run for the
 // lifetime of the queue. Enqueue blocks if the internal buffer is full.
-// Cancelling ctx stops accepting new work; in-flight items complete.
+// Cancelling ctx stops accepting new work; in-flight items complete using a
+// background context so they are not interrupted by the cancellation.
 func (q *RunQueue) Start(ctx context.Context) {
+	defer close(q.stopped)
 	sem := make(chan struct{}, q.maxParallel)
 	for {
 		select {
@@ -68,9 +73,13 @@ func (q *RunQueue) Start(ctx context.Context) {
 			return
 		case item := <-q.items:
 			sem <- struct{}{}
+			q.wg.Add(1)
 			go func(it queueItem) {
-				defer func() { <-sem }()
-				q.process(ctx, it)
+				defer func() {
+					<-sem
+					q.wg.Done()
+				}()
+				q.process(context.Background(), it)
 			}(item)
 		}
 	}
@@ -86,6 +95,30 @@ func (q *RunQueue) Wait(ctx context.Context, runID string) error {
 	}
 	select {
 	case <-ch:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Shutdown waits for all in-flight pipeline executions to complete.
+// It respects the provided context's deadline; if the deadline expires
+// before all workers finish, it returns the context error. In that case,
+// in-flight workers continue running in the background; the caller should
+// consider exiting the process if a clean stop is required.
+func (q *RunQueue) Shutdown(ctx context.Context) error {
+	select {
+	case <-q.stopped:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	done := make(chan struct{})
+	go func() {
+		q.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
