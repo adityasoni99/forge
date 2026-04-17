@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { SessionEvent, DerivedRule } from './types.js';
 
-interface RuleExecutor {
+export interface RuleExecutor {
   execute(ctx: unknown, prompt: string, config: unknown): Promise<string>;
 }
 
