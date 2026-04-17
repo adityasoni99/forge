@@ -30,6 +30,8 @@ func main() {
 		cmdForgeRun(os.Args[2:])
 	case "blueprint":
 		handleBlueprint(os.Args[2:])
+	case "plugin":
+		cmdPlugin(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
@@ -44,6 +46,8 @@ func printUsage() {
 	fmt.Println("  blueprint validate <file>  Validate a blueprint YAML file")
 	fmt.Println("  blueprint list             List built-in blueprints")
 	fmt.Println("  blueprint run [--harness <addr>] [--builtin <name> | <file>] [--task <text>]")
+	fmt.Println("  plugin install [--ide auto|cursor|claude-code|windsurf]  Install MCP plugin for IDE")
+	fmt.Println("  plugin status                                            Check plugin installation")
 }
 
 func cmdForgeRun(args []string) {
