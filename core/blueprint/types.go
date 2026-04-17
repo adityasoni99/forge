@@ -12,6 +12,7 @@ const (
 	NodeTypeDeterministic
 	NodeTypeGate
 	NodeTypeEval
+	NodeTypeHuman
 )
 
 func (nt NodeType) String() string {
@@ -24,6 +25,8 @@ func (nt NodeType) String() string {
 		return "gate"
 	case NodeTypeEval:
 		return "eval"
+	case NodeTypeHuman:
+		return "human"
 	default:
 		return "unknown"
 	}

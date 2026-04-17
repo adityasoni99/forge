@@ -194,6 +194,44 @@ func TestDockerSandboxEnsureImageInspectError(t *testing.T) {
 	}
 }
 
+func TestBuildRunArgsFiltersSecrets(t *testing.T) {
+	ds := NewDockerSandbox(nil)
+	config := SandboxConfig{
+		Image:        "forge:latest",
+		WorkspaceDir: "/tmp/ws",
+		Env: map[string]string{
+			"SAFE_VAR":       "ok",
+			"API_KEY":        "secret123",
+			"DB_PASSWORD":    "pass",
+			"AWS_SECRET_KEY": "aws-secret",
+			"FORGE_ADAPTER":  "claude",
+		},
+	}
+	args := ds.buildRunArgs(config, []string{"run"})
+
+	secretEntries := []string{"API_KEY=secret123", "DB_PASSWORD=pass", "AWS_SECRET_KEY=aws-secret"}
+	for _, arg := range args {
+		for _, secret := range secretEntries {
+			if arg == secret {
+				t.Errorf("secret env var %q leaked into args", arg)
+			}
+		}
+	}
+
+	found := false
+	for i, arg := range args {
+		if arg == "-e" && i+1 < len(args) && args[i+1] == "SAFE_VAR=ok" {
+			found = true
+		}
+		if arg == "-e" && i+1 < len(args) && args[i+1] == "FORGE_ADAPTER=claude" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected safe env vars in args")
+	}
+}
+
 func TestDockerSandboxEnsureImagePullError(t *testing.T) {
 	runner := &mockRunner{calls: []mockCall{
 		{wantName: "docker", exitCode: 1},

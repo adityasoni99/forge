@@ -2,6 +2,7 @@ package blueprint
 
 import (
 	"fmt"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -185,6 +186,18 @@ func buildNode(id string, ny NodeYAML, executor AgentExecutor) (Node, error) {
 			threshold = t
 		}
 		return NewEvalNode(id, prompt, criteria, threshold, executor), nil
+	case "human":
+		prompt, _ := ny.Config["prompt"].(string)
+		if prompt == "" {
+			return nil, fmt.Errorf("human node missing 'prompt' in config")
+		}
+		timeoutSec, _ := ny.Config["timeout"].(float64)
+		timeout := time.Duration(timeoutSec) * time.Second
+		headless := false
+		if h, ok := ny.Config["headless"].(bool); ok {
+			headless = h
+		}
+		return NewHumanNode(id, prompt, timeout, &HeadlessApprovalHandler{}, headless), nil
 	default:
 		return nil, fmt.Errorf("unknown node type: %q", ny.Type)
 	}

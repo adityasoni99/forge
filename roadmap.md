@@ -3,7 +3,7 @@
 > **Purpose:** Single checkpoint file for tracking what's done, what's next, and
 > where to resume. Reference this at the start of every new chat session.
 >
-> **Last updated:** 2026-04-15
+> **Last updated:** 2026-04-16
 
 ---
 
@@ -13,7 +13,7 @@
 |---------|-------|--------|
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
 | **v0.2** | Skills, tool pool, triggers, parallel runs | **Complete** |
-| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | **In progress** (Sub-plan A merged; Sub-plan B next) |
+| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | **In progress** (Sub-plans A–D complete; Sub-plan E next) |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
 ---
@@ -179,9 +179,46 @@ Delivery order: **A → B → (C and D in parallel) → E** (see design spec §3
 
 **Branch merged to `main`:** `v0.3/subplan-a-debt-hardening` (commits through Sub-plan A completion).
 
-### Sub-plan B: Multi-Adapter + Prompt Composition (Layer 2) — **Next**
+### Sub-plan B: Multi-Adapter + Prompt Composition (Layer 2) — **COMPLETE**
 
 **Plan:** [`docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md`](docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md)
+
+| Deliverable | Notes |
+|-------------|--------|
+| `AgentEvent` + capability-aware `AgentAdapter` | Streaming `execute()`, `getCapabilities()`, `interrupt()` |
+| `SyncAdapterWrapper` | Bridges sync adapters to streaming protocol |
+| Echo / Claude / Goose / Codex / Cursor adapters | CLI-spawn pattern; registered in harness server |
+| `composePromptStack` + `compressShellOutput` | 5-level prompt stack; shell output compression |
+| `AgentService` + proto `adapter` field | Multi-adapter registry; prompt stack + adapter selection |
+| Tests | Harness: 111 tests (vitest); Go `grpcexec` after `buf generate` |
+
+### Sub-plan C: Learning Loops (Layer 2) — **COMPLETE**
+
+**Plan:** [`docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md`](docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md)
+
+| Deliverable | Notes |
+|-------------|--------|
+| `SessionEvent` types | Shared types for memory/learning (`harness/src/memory/types.ts`) |
+| `SessionEventEmitter` | JSONL-per-run event log with cursor-based reads (`harness/src/memory/session.ts`) |
+| Failure-to-rule pipeline | `deriveRuleFromFailure` analyzes failure chains, writes rules to `.forge/rules/` |
+| Doc-gardening agent | `findStaleDocCandidates` + `blueprints/doc-gardening.yaml` blueprint |
+| AgentService session wiring | Emits `prompt_composed`, `adapter_called`, `adapter_result`, `error` events |
+| Tests | 13 new TS tests; 127 total harness tests |
+
+### Sub-plan D: Quality + Permissions + Human (Layer 1+2+3) — **COMPLETE**
+
+**Plan:** [`docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md`](docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md)
+
+| Deliverable | Notes |
+|-------------|--------|
+| `NodeTypeHuman` + `ApprovalHandler` | Human/approval node with headless auto-deny, timeout, YAML `type: human` |
+| `PermissionPipeline` | Two-phase: deterministic glob rules + async `ApprovalHandler` delegation |
+| Credential isolation | Env var filtering in sandbox (`*_KEY`, `*_SECRET`, `*_TOKEN`, `*_PASSWORD`, `*_CREDENTIAL`) |
+| Sprint contracts | `evaluateAgainstContract` with threshold-based pass/fail |
+| Skeptical evaluator | `SkepticalEvaluator` class with SCORE/FEEDBACK parsing |
+| Tests | 7 new Go tests (96 total blueprint); 5 new TS tests; 127 total harness tests |
+
+**Next:** Sub-plan E (Warm Pools) — see design spec §8.
 
 ---
 
@@ -243,9 +280,9 @@ Delivery order: **A → B → (C and D in parallel) → E** (see design spec §3
 | v0.2 Sub-plan C: Triggers + Parallel | `2026-04-13-subplan-c-triggers-parallel` | `docs/superpowers/plans/2026-04-13-subplan-c-triggers-parallel.md` | 3 | **Complete** |
 | v0.3 Design Spec | `2026-04-15-v03-learning-multiadapter-design` | `docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md` | All | Reference doc |
 | v0.3 Sub-plan A: Debt + Factory Hardening | `2026-04-15-subplan-a-v02-debt` | `docs/superpowers/plans/2026-04-15-subplan-a-v02-debt.md` | 3 | **Complete** |
-| v0.3 Sub-plan B: Multi-Adapter + Prompt | `2026-04-15-subplan-b-multiadapter-prompt` | `docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md` | 2 | **Next** |
-| v0.3 Sub-plan C: Learning Loops | `2026-04-15-subplan-c-learning-loops` | `docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md` | 2 | Planned |
-| v0.3 Sub-plan D: Quality + Permissions + Human | `2026-04-15-subplan-d-quality-permissions-human` | `docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md` | 1–3 | Planned |
+| v0.3 Sub-plan B: Multi-Adapter + Prompt | `2026-04-15-subplan-b-multiadapter-prompt` | `docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md` | 2 | **Complete** |
+| v0.3 Sub-plan C: Learning Loops | `2026-04-15-subplan-c-learning-loops` | `docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md` | 2 | **Complete** |
+| v0.3 Sub-plan D: Quality + Permissions + Human | `2026-04-15-subplan-d-quality-permissions-human` | `docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md` | 1–3 | **Complete** |
 | v0.3 Sub-plan E: Warm Pools | `2026-04-15-subplan-e-warm-pools` | `docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md` | 3 | Planned |
 
 v0.1 layer plans: `.cursor/plans/*.plan.md`
@@ -275,5 +312,5 @@ v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 5. For **v0.3 plans**, see `docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md` and `docs/superpowers/plans/2026-04-15-subplan-*.md`.
 6. Reference `project.md` for module map and `docs/design.md` for architecture.
 
-**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 Sub-plan A complete** (merged to `main`): SessionLog, queue graceful shutdown, repo resolver + webhook `repo_url`, TaskAssigner + SessionLog in pipeline, `forged` production wiring.
-**Next action:** Implement **v0.3 Sub-plan B** (Multi-Adapter + Prompt Composition, Layer 2 harness). See [`docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md`](docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md) and design spec [`docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md`](docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md) §3.
+**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 Sub-plans A through D complete** (merged to `main`): Sub-plan A — SessionLog, queue shutdown, repo resolver, pipeline wiring; Sub-plan B — multi-adapter harness, prompt stack, compression, proto `adapter` field; Sub-plan C — learning loops (session capture, failure-to-rule, doc-gardening); Sub-plan D — HumanNode, permission pipeline, credential isolation, quality gates. 127 harness tests, 96 blueprint tests.
+**Next action:** Implement **v0.3 Sub-plan E** (Warm Pools). Plan: [`2026-04-15-subplan-e-warm-pools.md`](docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md). Design spec: [`docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md`](docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md) §8.
