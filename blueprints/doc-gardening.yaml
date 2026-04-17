@@ -1,0 +1,25 @@
+name: doc-gardening
+version: "0.3.0"
+description: "Analyze documentation freshness and flag stale docs"
+when_to_use: "Periodic documentation maintenance or after major code changes"
+start: gather_changes
+
+nodes:
+  gather_changes:
+    type: deterministic
+    config:
+      command: "git log --since='30 days' --name-only --pretty=format:'%ad' --date=short | sort -u"
+  analyze:
+    type: agentic
+    config:
+      prompt: "Analyze the git log output and identify documentation that may be stale relative to recent code changes. List each stale doc with the related code paths and how many days since it was last updated."
+  report:
+    type: deterministic
+    config:
+      command: "echo 'Doc gardening report generated'"
+
+edges:
+  - from: gather_changes
+    to: analyze
+  - from: analyze
+    to: report
