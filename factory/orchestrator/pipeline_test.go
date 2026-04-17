@@ -524,6 +524,28 @@ func TestPipelineLazySandboxEnsureFailure(t *testing.T) {
 	}
 }
 
+func TestPipelineSandboxFailureIsNodeFailure(t *testing.T) {
+	sbx := &mockSandboxManager{
+		runResult: sandbox.SandboxResult{ExitCode: 137, Output: "Killed"},
+	}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: t.TempDir(), Branch: "forge/run-1", RepoDir: t.TempDir()}}
+	dlv := &mockDeliveryManager{}
+	p := NewPipeline(sbx, ws, dlv)
+
+	req := RunRequest{Task: "will crash", RepoDir: t.TempDir(), NoPR: true}
+	result, err := p.Execute(context.Background(), req)
+
+	if err != nil {
+		t.Fatalf("Execute should not return error for container failure, got: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if result.Error == "" {
+		t.Error("expected error message about container failure")
+	}
+}
+
 func TestBuildSandboxCommandBlueprintFileOnly(t *testing.T) {
 	req := RunRequest{
 		BlueprintFile: "tests/testdata/integration-smoke.yaml",
