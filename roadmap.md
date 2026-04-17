@@ -13,7 +13,7 @@
 |---------|-------|--------|
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
 | **v0.2** | Skills, tool pool, triggers, parallel runs | **Complete** |
-| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | **In progress** (Sub-plans A–D complete; Sub-plan E next) |
+| **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | **Complete** (Sub-plans A–E all done) |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
 ---
@@ -218,25 +218,41 @@ Delivery order: **A → B → (C and D in parallel) → E** (see design spec §3
 | Skeptical evaluator | `SkepticalEvaluator` class with SCORE/FEEDBACK parsing |
 | Tests | 7 new Go tests (96 total blueprint); 5 new TS tests; 127 total harness tests |
 
-**Next:** Sub-plan E (Warm Pools) — see design spec §8.
+### Sub-plan E: Container Warm Pools + Lazy Provisioning (Layer 3) — **COMPLETE**
+
+**Plan:** [`docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md`](docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md)
+
+| Deliverable | Notes |
+|-------------|--------|
+| `SandboxError` type | Structured container failure errors with `Unwrap()` support (`factory/sandbox/errors.go`) |
+| `WarmPool` interface + `DockerWarmPool` | Pre-heated container pool with Acquire/Release/Shutdown; mutex-guarded idle pool (`factory/sandbox/pool.go`) |
+| Lazy sandbox provisioning | `lazySandboxRunner` wrapper defers `EnsureImage` to first `Run()`; `WithLazySandbox` pipeline option |
+| `DockerSandbox.SetWarmPool` | Acquire-first/cold-fallback pattern in `Run()`; warm container exec via `docker exec` |
+| Daemon wiring | `--warm-pool-size`, `--warm-pool-image`, `--lazy-sandbox` flags; pool shutdown on SIGTERM |
+| Container-as-cattle | Non-zero exit codes → `RunStatusFailed`, not pipeline crashes; verified for OOM/SIGKILL (exit 137) |
+| Tests | 24 sandbox tests (94.3% coverage); 37 orchestrator tests (94.5% coverage); 127 harness tests; all pass with `-race` |
+
+**v0.3 feature-complete.** All five sub-plans (A through E) delivered and merged. Next milestone: v0.3.1 (Agent Plugin System) or v1.0.
 
 ---
 
-## v0.3 — Feature backlog (remaining)
+## v0.3 — Feature backlog (all delivered)
 
-| Feature | Layer | Source |
-|---------|-------|--------|
-| Memory / session capture | 2 | Master plan |
-| Failure-to-rule pipeline | 2 | Master plan |
-| Doc-gardening agent | 2 | Master plan |
-| Multiple agent adapters (Goose, Codex, Cursor) | 2 | Master plan |
-| Container warm pools | 3 | Master plan |
-| Full quality gate system (sprint contracts) | 2 | Master plan |
-| Prompt composition stack (5-level override) | 2 | design.md §5.3; Sub-plan B |
-| Permission pipeline (deterministic + async) | 3 | design.md §11 |
-| Human/approval node in blueprint engine | 1 | Archon, design.md §4.2 |
-| Shell output compression at tool boundary | 2 | rtk (rtk-ai/rtk) |
-| **Agent plugin system** — installable package for Cursor / Claude Code / Windsurf with short commands (`/forge run`, `/forge fix`, `/forge plan`); auto-manages harness + adapter selection | All | obra/superpowers model |
+All v0.3 features have been implemented across Sub-plans A–E:
+
+| Feature | Sub-plan | Status |
+|---------|----------|--------|
+| Memory / session capture | C | Done |
+| Failure-to-rule pipeline | C | Done |
+| Doc-gardening agent | C | Done |
+| Multiple agent adapters (Goose, Codex, Cursor) | B | Done |
+| Container warm pools | E | Done |
+| Full quality gate system (sprint contracts) | D | Done |
+| Prompt composition stack (5-level override) | B | Done |
+| Permission pipeline (deterministic + async) | D | Done |
+| Human/approval node in blueprint engine | D | Done |
+| Shell output compression at tool boundary | B | Done |
+| **Agent plugin system** — deferred to v0.3.1 | — | Planned |
 
 ---
 
@@ -283,7 +299,7 @@ Delivery order: **A → B → (C and D in parallel) → E** (see design spec §3
 | v0.3 Sub-plan B: Multi-Adapter + Prompt | `2026-04-15-subplan-b-multiadapter-prompt` | `docs/superpowers/plans/2026-04-15-subplan-b-multiadapter-prompt.md` | 2 | **Complete** |
 | v0.3 Sub-plan C: Learning Loops | `2026-04-15-subplan-c-learning-loops` | `docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md` | 2 | **Complete** |
 | v0.3 Sub-plan D: Quality + Permissions + Human | `2026-04-15-subplan-d-quality-permissions-human` | `docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md` | 1–3 | **Complete** |
-| v0.3 Sub-plan E: Warm Pools | `2026-04-15-subplan-e-warm-pools` | `docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md` | 3 | Planned |
+| v0.3 Sub-plan E: Warm Pools | `2026-04-15-subplan-e-warm-pools` | `docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md` | 3 | **Complete** |
 
 v0.1 layer plans: `.cursor/plans/*.plan.md`
 v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
@@ -312,5 +328,5 @@ v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 5. For **v0.3 plans**, see `docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md` and `docs/superpowers/plans/2026-04-15-subplan-*.md`.
 6. Reference `project.md` for module map and `docs/design.md` for architecture.
 
-**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 Sub-plans A through D complete** (merged to `main`): Sub-plan A — SessionLog, queue shutdown, repo resolver, pipeline wiring; Sub-plan B — multi-adapter harness, prompt stack, compression, proto `adapter` field; Sub-plan C — learning loops (session capture, failure-to-rule, doc-gardening); Sub-plan D — HumanNode, permission pipeline, credential isolation, quality gates. 127 harness tests, 96 blueprint tests.
-**Next action:** Implement **v0.3 Sub-plan E** (Warm Pools). Plan: [`2026-04-15-subplan-e-warm-pools.md`](docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md). Design spec: [`docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md`](docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md) §8.
+**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 complete** (all five sub-plans A–E merged to `main`): Sub-plan A — SessionLog, queue shutdown, repo resolver, pipeline wiring; Sub-plan B — multi-adapter harness, prompt stack, compression, proto `adapter` field; Sub-plan C — learning loops (session capture, failure-to-rule, doc-gardening); Sub-plan D — HumanNode, permission pipeline, credential isolation, quality gates; Sub-plan E — SandboxError, WarmPool, lazy provisioning, daemon wiring, container-as-cattle. 127 harness tests, 96+ Go tests.
+**Next action:** Plan **v0.3.1** (Agent Plugin System) or begin **v1.0** planning. See design spec §9 for plugin system deferral notes.

@@ -30,6 +30,8 @@ type CommandRunner interface {
 
 type ExecRunner struct{}
 
+func NewExecRunner() *ExecRunner { return &ExecRunner{} }
+
 func (r *ExecRunner) Run(ctx context.Context, name string, args ...string) (string, int, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	var out bytes.Buffer

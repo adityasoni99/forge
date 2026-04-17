@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/aditya-soni/forge/factory/delivery"
@@ -32,11 +33,12 @@ type Deliverer interface {
 
 // Pipeline wires workspace, sandbox, and delivery into a single run lifecycle.
 type Pipeline struct {
-	sandbox   SandboxRunner
-	workspace WorkspaceCreator
-	delivery  Deliverer
-	assigner  *TaskAssigner
-	session   SessionLog
+	sandbox     SandboxRunner
+	workspace   WorkspaceCreator
+	delivery    Deliverer
+	assigner    *TaskAssigner
+	session     SessionLog
+	lazySandbox bool
 }
 
 // PipelineOption configures optional Pipeline behavior.
@@ -51,6 +53,43 @@ func WithTaskAssigner(a *TaskAssigner) PipelineOption {
 // WithSessionLog configures the pipeline to emit events to the given session log.
 func WithSessionLog(s SessionLog) PipelineOption {
 	return func(p *Pipeline) { p.session = s }
+}
+
+// WithLazySandbox defers EnsureImage until the first Run() call, removing
+// container setup from the critical path for blueprints whose initial nodes
+// don't need the sandbox. Note: when lazy mode is active the "image ready"
+// lifecycle event is not emitted because EnsureImage runs inside the
+// wrapper's Run path rather than as a separate step.
+func WithLazySandbox(lazy bool) PipelineOption {
+	return func(p *Pipeline) { p.lazySandbox = lazy }
+}
+
+// lazySandboxRunner wraps a SandboxRunner and defers EnsureImage to the first
+// Run() invocation. Subsequent Run() calls reuse the already-ensured image.
+type lazySandboxRunner struct {
+	inner   SandboxRunner
+	ensured bool
+	mu      sync.Mutex
+}
+
+func (l *lazySandboxRunner) EnsureImage(ctx context.Context, config sandbox.SandboxConfig) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.ensured {
+		return nil
+	}
+	if err := l.inner.EnsureImage(ctx, config); err != nil {
+		return err
+	}
+	l.ensured = true
+	return nil
+}
+
+func (l *lazySandboxRunner) Run(ctx context.Context, config sandbox.SandboxConfig, command []string) (sandbox.SandboxResult, error) {
+	if err := l.EnsureImage(ctx, config); err != nil {
+		return sandbox.SandboxResult{}, err
+	}
+	return l.inner.Run(ctx, config, command)
 }
 
 // NewPipeline constructs a Pipeline from its three dependency interfaces.
@@ -106,19 +145,24 @@ func (p *Pipeline) Execute(ctx context.Context, req RunRequest) (RunResult, erro
 		NetworkMode:  "none",
 	}
 
-	ensureStart := time.Now()
-	if err := p.sandbox.EnsureImage(ctx, sbxConfig); err != nil {
-		appendEvent(&result.Events, "sandbox", "ensure image failed", time.Since(ensureStart))
-		result.Status = RunStatusFailed
-		result.Error = fmt.Sprintf("ensure image: %v", err)
-		result.Duration = time.Since(start)
-		return result, nil
+	sbxRunner := p.sandbox
+	if p.lazySandbox {
+		sbxRunner = &lazySandboxRunner{inner: p.sandbox}
+	} else {
+		ensureStart := time.Now()
+		if err := sbxRunner.EnsureImage(ctx, sbxConfig); err != nil {
+			appendEvent(&result.Events, "sandbox", "ensure image failed", time.Since(ensureStart))
+			result.Status = RunStatusFailed
+			result.Error = fmt.Sprintf("ensure image: %v", err)
+			result.Duration = time.Since(start)
+			return result, nil
+		}
+		appendEvent(&result.Events, "sandbox", "image ready", time.Since(ensureStart))
 	}
-	appendEvent(&result.Events, "sandbox", "image ready", time.Since(ensureStart))
 
 	command := buildSandboxCommand(req)
 	runStart := time.Now()
-	sbxResult, err := p.sandbox.Run(ctx, sbxConfig, command)
+	sbxResult, err := sbxRunner.Run(ctx, sbxConfig, command)
 	if err != nil {
 		appendEvent(&result.Events, "sandbox", "docker run error", time.Since(runStart))
 		result.Status = RunStatusFailed

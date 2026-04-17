@@ -417,6 +417,135 @@ func TestSubplanAIntegration(t *testing.T) {
 	}
 }
 
+// mockCallbackSandboxManager allows injecting custom EnsureImage/Run behavior.
+type mockCallbackSandboxManager struct {
+	ensureFn func(ctx context.Context, cfg sandbox.SandboxConfig) error
+	runFn    func(ctx context.Context, cfg sandbox.SandboxConfig, cmd []string) (sandbox.SandboxResult, error)
+}
+
+func (m *mockCallbackSandboxManager) EnsureImage(ctx context.Context, cfg sandbox.SandboxConfig) error {
+	if m.ensureFn != nil {
+		return m.ensureFn(ctx, cfg)
+	}
+	return nil
+}
+
+func (m *mockCallbackSandboxManager) Run(ctx context.Context, cfg sandbox.SandboxConfig, cmd []string) (sandbox.SandboxResult, error) {
+	if m.runFn != nil {
+		return m.runFn(ctx, cfg, cmd)
+	}
+	return sandbox.SandboxResult{ExitCode: 0}, nil
+}
+
+func TestPipelineLazySandboxDefersEnsureImage(t *testing.T) {
+	var callOrder []string
+	sbx := &mockCallbackSandboxManager{
+		ensureFn: func(_ context.Context, _ sandbox.SandboxConfig) error {
+			callOrder = append(callOrder, "ensure")
+			return nil
+		},
+		runFn: func(_ context.Context, _ sandbox.SandboxConfig, _ []string) (sandbox.SandboxResult, error) {
+			callOrder = append(callOrder, "run")
+			return sandbox.SandboxResult{ExitCode: 0}, nil
+		},
+	}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: t.TempDir(), Branch: "forge/lazy-1", RepoDir: t.TempDir()}}
+	dlv := &mockDeliveryManager{}
+
+	// With lazy=true, the pipeline must NOT call EnsureImage eagerly.
+	// The lazySandboxRunner wrapper calls EnsureImage inside Run, so the
+	// mock's EnsureImage and Run are called exactly once each.
+	p := NewPipeline(sbx, ws, dlv, WithLazySandbox(true))
+	req := RunRequest{Task: "plan only", RepoDir: t.TempDir(), NoPR: true}
+	_, _ = p.Execute(context.Background(), req)
+
+	if len(callOrder) != 2 {
+		t.Fatalf("expected 2 calls (ensure + run), got %d: %v", len(callOrder), callOrder)
+	}
+	if callOrder[0] != "ensure" || callOrder[1] != "run" {
+		t.Fatalf("call order = %v, want [ensure run]", callOrder)
+	}
+
+	// Contrast: without lazy, EnsureImage is called eagerly (separate call)
+	// AND then Run also triggers the inner Run. With lazy, EnsureImage is
+	// called exactly once via the wrapper—not twice (eager + lazy).
+	// The ensureCount==1 check in TestPipelineLazySandboxCallsEnsureOnRun
+	// covers the count; here we verify order: ensure strictly before run,
+	// with no extra eager ensure preceding them.
+}
+
+func TestPipelineLazySandboxCallsEnsureOnRun(t *testing.T) {
+	var ensureCount int
+	sbx := &mockCallbackSandboxManager{
+		ensureFn: func(_ context.Context, _ sandbox.SandboxConfig) error {
+			ensureCount++
+			return nil
+		},
+		runFn: func(_ context.Context, _ sandbox.SandboxConfig, _ []string) (sandbox.SandboxResult, error) {
+			return sandbox.SandboxResult{ExitCode: 0, Output: "ok"}, nil
+		},
+	}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: t.TempDir(), Branch: "forge/lazy-2", RepoDir: t.TempDir()}}
+	dlv := &mockDeliveryManager{}
+	p := NewPipeline(sbx, ws, dlv, WithLazySandbox(true))
+
+	req := RunRequest{Task: "build", RepoDir: t.TempDir(), NoPR: true}
+	result, err := p.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Status != RunStatusPassed {
+		t.Errorf("Status = %v, want Passed", result.Status)
+	}
+	if ensureCount != 1 {
+		t.Errorf("EnsureImage called %d times, want exactly 1 (via lazy Run)", ensureCount)
+	}
+}
+
+func TestPipelineLazySandboxEnsureFailure(t *testing.T) {
+	sbx := &mockCallbackSandboxManager{
+		ensureFn: func(_ context.Context, _ sandbox.SandboxConfig) error {
+			return fmt.Errorf("image pull timeout")
+		},
+	}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: t.TempDir(), Branch: "forge/lazy-fail", RepoDir: t.TempDir()}}
+	dlv := &mockDeliveryManager{}
+	p := NewPipeline(sbx, ws, dlv, WithLazySandbox(true))
+
+	result, err := p.Execute(context.Background(), RunRequest{Task: "fail", RepoDir: t.TempDir(), NoPR: true})
+	if err != nil {
+		t.Fatalf("Execute should not return error: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if !strings.Contains(result.Error, "sandbox run") {
+		t.Errorf("Error = %q, want to contain 'sandbox run'", result.Error)
+	}
+}
+
+func TestPipelineSandboxFailureIsNodeFailure(t *testing.T) {
+	sbx := &mockSandboxManager{
+		runResult: sandbox.SandboxResult{ExitCode: 137, Output: "Killed"},
+	}
+	ws := &mockWorkspaceManager{ws: &workspace.Workspace{Dir: t.TempDir(), Branch: "forge/run-1", RepoDir: t.TempDir()}}
+	dlv := &mockDeliveryManager{}
+	p := NewPipeline(sbx, ws, dlv)
+
+	req := RunRequest{Task: "will crash", RepoDir: t.TempDir(), NoPR: true}
+	result, err := p.Execute(context.Background(), req)
+
+	if err != nil {
+		t.Fatalf("Execute should not return error for container failure, got: %v", err)
+	}
+	if result.Status != RunStatusFailed {
+		t.Errorf("Status = %v, want Failed", result.Status)
+	}
+	if result.Error == "" {
+		t.Error("expected error message about container failure")
+	}
+}
+
 func TestBuildSandboxCommandBlueprintFileOnly(t *testing.T) {
 	req := RunRequest{
 		BlueprintFile: "tests/testdata/integration-smoke.yaml",

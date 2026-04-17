@@ -24,28 +24,42 @@ func main() {
 	dryRun := flag.Bool("dry-run", false, "use log-only pipeline (no Docker/git)")
 	sessionsDir := flag.String("sessions-dir", envOr("FORGED_SESSIONS_DIR", ".forge/sessions"), "session log directory")
 	repoCacheDir := flag.String("repo-cache-dir", envOr("FORGED_REPO_CACHE", ".forge/repo-cache"), "bare clone cache for repo_url resolution")
+	warmPoolSize := flag.Int("warm-pool-size", envOrInt("FORGED_WARM_POOL_SIZE", 0), "warm container pool size (0=disabled)")
+	warmPoolImage := flag.String("warm-pool-image", envOr("FORGED_WARM_POOL_IMAGE", "forge:latest"), "image for warm pool containers")
+	lazySandboxFlag := flag.Bool("lazy-sandbox", true, "defer sandbox provisioning until first sandbox-bound node")
 	flag.Parse()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	registry := orchestrator.NewRunRegistry()
 	sessionLog := orchestrator.NewFileSessionLog(*sessionsDir)
 
 	var pipeline orchestrator.PipelineExecutor
+	var warmPool *sandbox.DockerWarmPool
 	if *dryRun {
 		pipeline = &logPipeline{}
 	} else {
 		sbx := sandbox.NewDockerSandbox(nil)
+		if *warmPoolSize > 0 {
+			warmPool = sandbox.NewDockerWarmPool(sandbox.NewExecRunner(), *warmPoolSize)
+			warmPool.Preheat(ctx, sandbox.SandboxConfig{Image: *warmPoolImage})
+			sbx.SetWarmPool(warmPool)
+		}
 		ws := workspace.NewManager()
 		dlv := delivery.NewGitDelivery(&sandbox.ExecRunner{})
 		assigner := orchestrator.NewTaskAssigner()
-		pipeline = orchestrator.NewPipeline(sbx, ws, dlv,
+
+		pipelineOpts := []orchestrator.PipelineOption{
 			orchestrator.WithTaskAssigner(assigner),
 			orchestrator.WithSessionLog(sessionLog),
-		)
+		}
+		if *lazySandboxFlag {
+			pipelineOpts = append(pipelineOpts, orchestrator.WithLazySandbox(true))
+		}
+		pipeline = orchestrator.NewPipeline(sbx, ws, dlv, pipelineOpts...)
 	}
 	queue := orchestrator.NewRunQueue(registry, pipeline, *maxParallel)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	go queue.Start(ctx)
 
 	resolver := triggers.NewGitRepoResolver(*repoCacheDir)
@@ -79,6 +93,11 @@ func main() {
 
 	if err := queue.Shutdown(shutdownCtx); err != nil {
 		log.Printf("queue shutdown: %v", err)
+	}
+	if warmPool != nil {
+		if err := warmPool.Shutdown(shutdownCtx); err != nil {
+			log.Printf("warm pool shutdown: %v", err)
+		}
 	}
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("http shutdown: %v", err)
