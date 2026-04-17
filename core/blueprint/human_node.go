@@ -48,6 +48,13 @@ func (n *HumanNode) Execute(ctx context.Context, state *RunState) (NodeResult, e
 		}, nil
 	}
 
+	if n.handler == nil {
+		return NodeResult{
+			Status: NodeStatusFailed,
+			Error:  "no approval handler configured",
+		}, nil
+	}
+
 	execCtx := ctx
 	if n.timeout > 0 {
 		var cancel context.CancelFunc

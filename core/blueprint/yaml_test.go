@@ -804,6 +804,56 @@ edges: []
 	}
 }
 
+func TestBuildGraphHumanNode(t *testing.T) {
+	yamlData := `
+name: human-test
+version: "0.1"
+start: approve
+nodes:
+  approve:
+    type: human
+    config:
+      prompt: "Approve deployment?"
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	g, err := bp.BuildGraph(&mockExecutor{})
+	if err != nil {
+		t.Fatalf("BuildGraph: %v", err)
+	}
+	raw, ok := g.GetNode("approve")
+	if !ok {
+		t.Fatal("node 'approve' not found")
+	}
+	if raw.Type() != NodeTypeHuman {
+		t.Errorf("Type() = %v, want Human", raw.Type())
+	}
+}
+
+func TestBuildGraphHumanNodeMissingPrompt(t *testing.T) {
+	yamlData := `
+name: t
+version: "0.1"
+start: h
+nodes:
+  h:
+    type: human
+    config: {}
+edges: []
+`
+	bp, err := ParseBlueprintYAML([]byte(yamlData))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_, err = bp.BuildGraph(&mockExecutor{})
+	if err == nil {
+		t.Fatal("expected error for human node without prompt")
+	}
+}
+
 func TestBackwardCompatibilityNoDependsOn(t *testing.T) {
 	bp, err := ParseBlueprintYAML([]byte(testYAML))
 	if err != nil {
