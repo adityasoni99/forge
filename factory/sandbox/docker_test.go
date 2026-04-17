@@ -243,3 +243,89 @@ func TestDockerSandboxEnsureImagePullError(t *testing.T) {
 		t.Fatal("expected error when pull returns error")
 	}
 }
+
+// mockWarmPool implements WarmPool for testing the warm-container path
+// in DockerSandbox.Run.
+type mockWarmPool struct {
+	acquireContainer *WarmContainer
+	acquireErr       error
+	released         bool
+}
+
+func (m *mockWarmPool) Acquire(_ context.Context, _ SandboxConfig) (*WarmContainer, error) {
+	return m.acquireContainer, m.acquireErr
+}
+
+func (m *mockWarmPool) Release(_ *WarmContainer) error {
+	m.released = true
+	return nil
+}
+
+func (m *mockWarmPool) Shutdown(_ context.Context) error { return nil }
+
+func TestDockerSandboxRunUsesWarmPool(t *testing.T) {
+	runner := &mockRunner{calls: []mockCall{
+		{wantName: "docker", output: "warm result", exitCode: 0},
+	}}
+	pool := &mockWarmPool{
+		acquireContainer: &WarmContainer{ContainerID: "warm-abc", Image: "forge:latest"},
+	}
+	ds := NewDockerSandbox(runner)
+	ds.SetWarmPool(pool)
+
+	result, err := ds.Run(context.Background(), SandboxConfig{Image: "forge:latest"}, []string{"--blueprint", "test"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result.ExitCode != 0 {
+		t.Errorf("ExitCode = %d, want 0", result.ExitCode)
+	}
+	if !strings.Contains(result.Output, "warm result") {
+		t.Errorf("Output = %q, want to contain 'warm result'", result.Output)
+	}
+	if !pool.released {
+		t.Error("expected pool.Release to be called")
+	}
+}
+
+func TestDockerSandboxRunFallsBackOnPoolEmpty(t *testing.T) {
+	runner := &mockRunner{calls: []mockCall{
+		{wantName: "docker", output: "cold result", exitCode: 0},
+	}}
+	pool := &mockWarmPool{acquireErr: ErrPoolEmpty}
+	ds := NewDockerSandbox(runner)
+	ds.SetWarmPool(pool)
+
+	result, err := ds.Run(context.Background(), SandboxConfig{Image: "forge:latest"}, []string{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if !strings.Contains(result.Output, "cold result") {
+		t.Errorf("Output = %q, want to contain 'cold result' (cold path)", result.Output)
+	}
+	if pool.released {
+		t.Error("expected pool.Release NOT to be called on fallback path")
+	}
+}
+
+func TestDockerSandboxRunWarmContainerExecError(t *testing.T) {
+	runner := &mockRunner{calls: []mockCall{
+		{wantName: "docker", err: fmt.Errorf("exec failed")},
+	}}
+	pool := &mockWarmPool{
+		acquireContainer: &WarmContainer{ContainerID: "warm-xyz", Image: "forge:latest"},
+	}
+	ds := NewDockerSandbox(runner)
+	ds.SetWarmPool(pool)
+
+	_, err := ds.Run(context.Background(), SandboxConfig{Image: "forge:latest"}, []string{})
+	if err == nil {
+		t.Fatal("expected error when docker exec fails in warm container")
+	}
+	if !strings.Contains(err.Error(), "warm container") {
+		t.Errorf("error = %q, want to mention 'warm container'", err.Error())
+	}
+	if !pool.released {
+		t.Error("expected pool.Release to be called even on exec error")
+	}
+}

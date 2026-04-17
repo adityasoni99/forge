@@ -76,13 +76,13 @@ func (p *DockerWarmPool) Acquire(_ context.Context, config SandboxConfig) (*Warm
 // If the reset fails, the container is destroyed instead.
 func (p *DockerWarmPool) Release(container *WarmContainer) error {
 	ctx := context.Background()
-	_, _, err := p.runner.Run(ctx, "docker", "exec", container.ContainerID, "git", "clean", "-fdx")
-	if err != nil {
+	_, exitCode, err := p.runner.Run(ctx, "docker", "exec", container.ContainerID, "git", "clean", "-fdx")
+	if err != nil || exitCode != 0 {
 		p.destroyContainer(ctx, container)
 		return nil
 	}
-	_, _, err = p.runner.Run(ctx, "docker", "exec", container.ContainerID, "git", "reset", "--hard")
-	if err != nil {
+	_, exitCode, err = p.runner.Run(ctx, "docker", "exec", container.ContainerID, "git", "reset", "--hard")
+	if err != nil || exitCode != 0 {
 		p.destroyContainer(ctx, container)
 		return nil
 	}
@@ -108,7 +108,11 @@ func (p *DockerWarmPool) Shutdown(ctx context.Context) error {
 }
 
 func (p *DockerWarmPool) createContainer(ctx context.Context, config SandboxConfig) (*WarmContainer, error) {
-	args := []string{"create", "-v", config.WorkspaceDir + ":/workspace", config.Image}
+	args := []string{"create"}
+	if config.WorkspaceDir != "" {
+		args = append(args, "-v", config.WorkspaceDir+":/workspace")
+	}
+	args = append(args, config.Image)
 	output, exitCode, err := p.runner.Run(ctx, "docker", args...)
 	if err != nil || exitCode != 0 {
 		return nil, errors.New("failed to create warm container")

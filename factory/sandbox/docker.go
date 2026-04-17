@@ -10,6 +10,13 @@ import (
 
 type DockerSandbox struct {
 	runner CommandRunner
+	pool   WarmPool
+}
+
+// SetWarmPool attaches a warm pool. When set, Run tries Acquire first;
+// on miss (ErrPoolEmpty), it falls back to a cold docker run.
+func (d *DockerSandbox) SetWarmPool(pool WarmPool) {
+	d.pool = pool
 }
 
 func NewDockerSandbox(runner CommandRunner) *DockerSandbox {
@@ -39,10 +46,33 @@ func (d *DockerSandbox) EnsureImage(ctx context.Context, config SandboxConfig) e
 
 func (d *DockerSandbox) Run(ctx context.Context, config SandboxConfig, command []string) (SandboxResult, error) {
 	start := time.Now()
+
+	if d.pool != nil {
+		container, err := d.pool.Acquire(ctx, config)
+		if err == nil {
+			result, execErr := d.runInWarmContainer(ctx, container, command, start)
+			_ = d.pool.Release(container)
+			return result, execErr
+		}
+	}
+
 	args := d.buildRunArgs(config, command)
 	output, exitCode, err := d.runner.Run(ctx, "docker", args...)
 	if err != nil {
 		return SandboxResult{}, fmt.Errorf("docker run: %w", err)
+	}
+	return SandboxResult{
+		ExitCode: exitCode,
+		Output:   output,
+		Duration: time.Since(start),
+	}, nil
+}
+
+func (d *DockerSandbox) runInWarmContainer(ctx context.Context, container *WarmContainer, command []string, start time.Time) (SandboxResult, error) {
+	args := append([]string{"exec", container.ContainerID}, command...)
+	output, exitCode, err := d.runner.Run(ctx, "docker", args...)
+	if err != nil {
+		return SandboxResult{}, fmt.Errorf("docker exec in warm container: %w", err)
 	}
 	return SandboxResult{
 		ExitCode: exitCode,
