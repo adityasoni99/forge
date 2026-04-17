@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { resolveConfig, DEFAULT_CONFIG } from '../../src/plugin/config.js';
-import type { PluginConfig } from '../../src/plugin/types.js';
 
 describe('resolveConfig', () => {
   it('returns defaults when no overrides', () => {
@@ -11,12 +10,7 @@ describe('resolveConfig', () => {
   it('merges partial overrides with defaults', () => {
     const config = resolveConfig({ defaultAdapter: 'goose' });
     expect(config.defaultAdapter).toBe('goose');
-    expect(config.executionMode).toBe(DEFAULT_CONFIG.executionMode);
-  });
-
-  it('auto execution mode is the default', () => {
-    const config = resolveConfig();
-    expect(config.executionMode).toBe('auto');
+    expect(config.forgeBinaryPath).toBe(DEFAULT_CONFIG.forgeBinaryPath);
   });
 
   it('respects explicit forgeBinaryPath', () => {
@@ -24,8 +18,14 @@ describe('resolveConfig', () => {
     expect(config.forgeBinaryPath).toBe('/usr/local/bin/forge');
   });
 
-  it('default harnessPort is 50051', () => {
+  it('default forgeBinaryPath is forge', () => {
     const config = resolveConfig();
-    expect(config.harnessPort).toBe(50051);
+    expect(config.forgeBinaryPath).toBe('forge');
+  });
+
+  it('does not include removed fields (executionMode, harnessPort)', () => {
+    const config = resolveConfig() as Record<string, unknown>;
+    expect(config).not.toHaveProperty('executionMode');
+    expect(config).not.toHaveProperty('harnessPort');
   });
 });

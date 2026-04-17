@@ -73,5 +73,6 @@ describe('ForgePluginCore', () => {
     const status = core.getStatus();
     expect(status.ide).toBeDefined();
     expect(status.availableAdapters).toContain('echo');
+    expect(status).not.toHaveProperty('executionMode');
   });
 });

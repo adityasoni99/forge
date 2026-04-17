@@ -19,12 +19,15 @@ describe('plugin integration', () => {
     process.env = originalEnv;
   });
 
-  const core = new ForgePluginCore({
-    adapters: new Map([['echo', new EchoAdapter()]]),
-    config: { defaultAdapter: 'echo' },
-  });
+  function createCore(): ForgePluginCore {
+    return new ForgePluginCore({
+      adapters: new Map([['echo', new EchoAdapter()]]),
+      config: { defaultAdapter: 'echo' },
+    });
+  }
 
   it('forge_run executes with echo adapter', async () => {
+    const core = createCore();
     const result = await core.executeCommand('run', 'Add user authentication');
     expect(result.success).toBe(true);
     expect(result.mode).toBe('direct');
@@ -33,6 +36,7 @@ describe('plugin integration', () => {
   });
 
   it('forge_fix executes with file context', async () => {
+    const core = createCore();
     const result = await core.executeCommand('fix', 'NullPointerException in auth', {
       filePath: 'src/auth.ts',
       errorOutput: 'TypeError: Cannot read property of null',
@@ -42,15 +46,17 @@ describe('plugin integration', () => {
   });
 
   it('forge_plan executes with plan-only prompt', async () => {
+    const core = createCore();
     const result = await core.executeCommand('plan', 'Redesign the API layer');
     expect(result.success).toBe(true);
     expect(result.output).toContain('plan');
   });
 
   it('forge_status returns plugin info', () => {
+    const core = createCore();
     const status = core.getStatus();
     expect(status.availableAdapters).toContain('echo');
-    expect(status.executionMode).toBe('auto');
+    expect(status).not.toHaveProperty('executionMode');
   });
 
   it('createForgeTools returns valid tool definitions', async () => {

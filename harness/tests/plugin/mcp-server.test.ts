@@ -1,14 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { createForgeTools } from '../../src/mcp-server.js';
+import { createForgeTools, FORGE_TOOLS } from '../../src/mcp-server.js';
 
-describe('createForgeTools', () => {
-  it('returns tool definitions for run, fix, plan, status', () => {
-    const tools = createForgeTools();
-    const names = tools.map(t => t.name);
+describe('FORGE_TOOLS', () => {
+  it('is a frozen array (single source of truth)', () => {
+    expect(Object.isFrozen(FORGE_TOOLS)).toBe(true);
+  });
+
+  it('contains definitions for run, fix, plan, status', () => {
+    const names = FORGE_TOOLS.map(t => t.name);
     expect(names).toContain('forge_run');
     expect(names).toContain('forge_fix');
     expect(names).toContain('forge_plan');
     expect(names).toContain('forge_status');
+  });
+});
+
+describe('createForgeTools', () => {
+  it('returns the same FORGE_TOOLS reference', () => {
+    expect(createForgeTools()).toBe(FORGE_TOOLS);
   });
 
   it('forge_run tool has task parameter', () => {

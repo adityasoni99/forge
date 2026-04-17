@@ -49,26 +49,33 @@ export interface PromptContext {
   selection?: string;
 }
 
+function escapeTemplateTokens(input: string): string {
+  return input
+    .replace(/\{\{/g, '{ {')
+    .replace(/\}\}/g, '} }');
+}
+
 export function buildTaskPrompt(
   command: CommandDefinition,
   task: string,
   context?: PromptContext,
 ): string {
-  let prompt = command.promptTemplate.replace(/\{\{task\}\}/g, task);
+  let prompt = command.promptTemplate.replace(/\{\{task\}\}/g, escapeTemplateTokens(task));
 
   if (context?.filePath) {
+    const safeFilePath = escapeTemplateTokens(context.filePath);
     prompt = prompt
       .replace(/\{\{#filePath\}\}(.*?)\{\{\/filePath\}\}/gs, '$1')
-      .replace(/\{\{filePath\}\}/g, context.filePath);
+      .replace(/\{\{filePath\}\}/g, safeFilePath);
   } else {
     prompt = prompt.replace(/\{\{#filePath\}\}.*?\{\{\/filePath\}\}/gs, '');
   }
 
   if (context?.errorOutput) {
-    prompt += `\n\nError output:\n${context.errorOutput}`;
+    prompt += `\n\nError output:\n${escapeTemplateTokens(context.errorOutput)}`;
   }
   if (context?.selection) {
-    prompt += `\n\nSelected code:\n${context.selection}`;
+    prompt += `\n\nSelected code:\n${escapeTemplateTokens(context.selection)}`;
   }
 
   return prompt.trim();

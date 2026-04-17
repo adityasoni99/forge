@@ -28,9 +28,20 @@ export class ForgeExecutor {
 
   async execute(req: ExecuteRequest): Promise<ExecutionResult> {
     const start = Date.now();
-    const result = await this.executeDirect(req);
-    result.durationMs = Date.now() - start;
-    return result;
+    try {
+      const result = await this.executeDirect(req);
+      result.durationMs = Date.now() - start;
+      return result;
+    } catch (err) {
+      return {
+        output: '',
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
+        mode: 'direct',
+        adapter: req.adapter,
+        durationMs: Date.now() - start,
+      };
+    }
   }
 
   private async executeDirect(req: ExecuteRequest): Promise<ExecutionResult> {

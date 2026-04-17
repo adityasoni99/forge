@@ -51,4 +51,23 @@ describe('buildTaskPrompt', () => {
     expect(prompt).toContain('plan');
     expect(prompt).not.toContain('implement');
   });
+
+  it('escapes template tokens in task input to prevent injection', () => {
+    const cmd = resolveCommand('run')!;
+    const malicious = 'Fix {{filePath}} and {{#filePath}}injected{{/filePath}}';
+    const prompt = buildTaskPrompt(cmd, malicious);
+    expect(prompt).not.toContain('{{filePath}}');
+    expect(prompt).not.toContain('{{#filePath}}');
+    expect(prompt).toContain('{ {filePath} }');
+  });
+
+  it('escapes template tokens in context fields', () => {
+    const cmd = resolveCommand('fix')!;
+    const prompt = buildTaskPrompt(cmd, 'bug', {
+      filePath: 'src/{{task}}.ts',
+      errorOutput: 'error at {{task}}',
+    });
+    expect(prompt).not.toContain('{{task}}');
+    expect(prompt).toContain('{ {task} }');
+  });
 });

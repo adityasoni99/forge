@@ -13,9 +13,7 @@ export interface IDEContext {
 
 export interface PluginConfig {
   defaultAdapter?: string;
-  executionMode?: 'direct' | 'pipeline' | 'auto';
   forgeBinaryPath?: string;
-  harnessPort?: number;
 }
 
 export interface CommandDefinition {
@@ -30,7 +28,7 @@ export interface ExecutionResult {
   output: string;
   success: boolean;
   error?: string;
-  mode: 'direct' | 'pipeline';
+  mode: 'direct';
   adapter: string;
   durationMs: number;
 }

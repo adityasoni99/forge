@@ -16,7 +16,6 @@ export interface PluginStatus {
   ide: string;
   defaultAdapter: string;
   availableAdapters: string[];
-  executionMode: string;
   workingDirectory: string;
 }
 
@@ -74,7 +73,6 @@ export class ForgePluginCore {
       ide: this.ideContext.ide,
       defaultAdapter: this.config.defaultAdapter,
       availableAdapters: this.adapterNames,
-      executionMode: this.config.executionMode,
       workingDirectory: this.ideContext.workingDirectory,
     };
   }

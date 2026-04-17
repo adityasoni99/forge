@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ForgeExecutor } from '../../src/plugin/executor.js';
-import { IDEType } from '../../src/plugin/types.js';
-import type { PluginConfig, IDEContext, ExecutionResult } from '../../src/plugin/types.js';
+import type { PluginConfig, ExecutionResult } from '../../src/plugin/types.js';
 import type { AgentAdapter, AgentAdapterRequest, AgentCapabilities } from '../../src/adapters/types.js';
 import type { AgentEvent } from '../../src/adapters/events.js';
 
@@ -29,7 +28,7 @@ describe('ForgeExecutor', () => {
     mockAdapter = new MockAdapter();
     executor = new ForgeExecutor({
       adapters: new Map([['mock', mockAdapter]]),
-      config: { defaultAdapter: 'mock', executionMode: 'direct', forgeBinaryPath: 'forge', harnessPort: 50051 },
+      config: { defaultAdapter: 'mock', forgeBinaryPath: 'forge' },
     });
   });
 
