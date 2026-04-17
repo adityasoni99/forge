@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { SessionEvent, SessionEventType } from './types.js';
 
 export interface EmitOptions {
@@ -23,7 +24,7 @@ export class SessionEventEmitter {
     await fs.mkdir(this.sessionsDir, { recursive: true });
 
     const event: SessionEvent = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `${Date.now()}-${randomUUID().slice(0, 8)}`,
       timestamp: new Date().toISOString(),
       runID,
       type: options.type,
