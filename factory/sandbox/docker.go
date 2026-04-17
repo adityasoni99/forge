@@ -3,6 +3,8 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -49,6 +51,18 @@ func (d *DockerSandbox) Run(ctx context.Context, config SandboxConfig, command [
 	}, nil
 }
 
+var secretPatterns = []string{"*_KEY", "*_SECRET", "*_TOKEN", "*_PASSWORD", "*_CREDENTIAL"}
+
+func isSecretEnv(key string) bool {
+	upper := strings.ToUpper(key)
+	for _, pattern := range secretPatterns {
+		if matched, _ := filepath.Match(pattern, upper); matched {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *DockerSandbox) buildRunArgs(config SandboxConfig, command []string) []string {
 	args := []string{"run", "--rm"}
 
@@ -56,7 +70,9 @@ func (d *DockerSandbox) buildRunArgs(config SandboxConfig, command []string) []s
 		args = append(args, "-v", config.WorkspaceDir+":/workspace")
 	}
 	for k, v := range config.Env {
-		args = append(args, "-e", k+"="+v)
+		if !isSecretEnv(k) {
+			args = append(args, "-e", k+"="+v)
+		}
 	}
 	if config.CPULimit != "" {
 		args = append(args, "--cpus", config.CPULimit)
