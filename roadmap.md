@@ -3,7 +3,7 @@
 > **Purpose:** Single checkpoint file for tracking what's done, what's next, and
 > where to resume. Reference this at the start of every new chat session.
 >
-> **Last updated:** 2026-04-16
+> **Last updated:** 2026-04-17
 
 ---
 
@@ -257,17 +257,22 @@ All v0.3 features have been implemented across Sub-plans A–E:
 
 ---
 
-## v0.3.1 — Agent Plugin System
+## v0.3.1 — Agent Plugin System — **COMPLETE**
+
+**Plan:** `.cursor/plans/agent_plugin_system_ffdc9187.plan.md`
 
 | Deliverable | Notes |
 |-------------|-------|
-| Plugin types + config | Zero-config defaults, `.forge/plugin.yaml` override |
-| IDE detection | Cursor / Claude Code / Windsurf from env vars |
-| Command registry | `forge_run`, `forge_fix`, `forge_plan` mapping to blueprints |
-| ForgeExecutor | Direct `AgentService` execution, prompt composition |
+| Plugin types + config | Zero-config defaults with `PluginConfig` interface |
+| IDE detection | Cursor / Claude Code / Windsurf from env vars; aligned `"unknown"` fallback (Go + TS) |
+| Command registry | `forge_run`, `forge_fix`, `forge_plan` mapping to blueprints with template injection protection |
+| ForgeExecutor | Direct `AgentService` execution with error resilience (try/catch) |
 | ForgePluginCore | Orchestrates IDE detection, config, command routing |
-| MCP server | stdio transport, `@modelcontextprotocol/sdk`, 4 tools |
-| CLI installer | `forge plugin install --ide auto\|cursor\|claude-code\|windsurf` |
+| MCP server | stdio transport, `@modelcontextprotocol/sdk`, 4 tools; `FORGE_TOOLS` single source of truth; `z.string().min(1)` validation |
+| CLI installer | `forge plugin install --ide auto\|cursor\|claude-code\|windsurf`; `FORGE_ROOT` env override; merge-safe `writeMCPConfig` |
+| Code review hardening | Template injection defense (H2), single-source tool defs (H4), removed unused config fields (M3), aligned Go/TS terminology (M1) |
+
+**Tests:** 42 new plugin TS tests (168 total harness); 16 Go CLI tests (211 total Go). All passing.
 
 ---
 
@@ -315,6 +320,7 @@ All v0.3 features have been implemented across Sub-plans A–E:
 | v0.3 Sub-plan C: Learning Loops | `2026-04-15-subplan-c-learning-loops` | `docs/superpowers/plans/2026-04-15-subplan-c-learning-loops.md` | 2 | **Complete** |
 | v0.3 Sub-plan D: Quality + Permissions + Human | `2026-04-15-subplan-d-quality-permissions-human` | `docs/superpowers/plans/2026-04-15-subplan-d-quality-permissions-human.md` | 1–3 | **Complete** |
 | v0.3 Sub-plan E: Warm Pools | `2026-04-15-subplan-e-warm-pools` | `docs/superpowers/plans/2026-04-15-subplan-e-warm-pools.md` | 3 | **Complete** |
+| v0.3.1: Agent Plugin System | `agent_plugin_system_ffdc9187` | `.cursor/plans/agent_plugin_system_ffdc9187.plan.md` | 2 | **Complete** |
 
 v0.1 layer plans: `.cursor/plans/*.plan.md`
 v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
@@ -343,5 +349,5 @@ v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 5. For **v0.3 plans**, see `docs/superpowers/specs/2026-04-15-v03-learning-multiadapter-design.md` and `docs/superpowers/plans/2026-04-15-subplan-*.md`.
 6. Reference `project.md` for module map and `docs/design.md` for architecture.
 
-**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 complete** (all five sub-plans A–E merged to `main`): Sub-plan A — SessionLog, queue shutdown, repo resolver, pipeline wiring; Sub-plan B — multi-adapter harness, prompt stack, compression, proto `adapter` field; Sub-plan C — learning loops (session capture, failure-to-rule, doc-gardening); Sub-plan D — HumanNode, permission pipeline, credential isolation, quality gates; Sub-plan E — SandboxError, WarmPool, lazy provisioning, daemon wiring, container-as-cattle. 127 harness tests, 96+ Go tests.
-**Next action:** Begin **v1.0** planning. v0.3.1 (Agent Plugin System) is complete — MCP server, IDE detection, command registry, CLI installer all shipped.
+**Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 complete** (all five sub-plans A–E merged to `main`). **v0.3.1 complete** — Agent Plugin System with MCP server, IDE detection, command registry, CLI installer, template injection protection, and code review hardening. 168 harness tests, 211 Go tests (379 total).
+**Next action:** Begin **v1.0** planning.
