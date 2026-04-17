@@ -113,6 +113,7 @@ depth is in `docs/design.md`.
 | `factory/delivery` | 3 | Go | git provider APIs | **Complete** |
 | `factory/triggers` | 3 | Go | `factory/orchestrator` | **Complete** (webhook HTTP handler) |
 | `cmd/forged` | 3 | Go | factory packages | **Complete** (daemon skeleton) |
+| `harness/src/plugin/` | 2 | TypeScript | `harness/` (adapters, agent-service, context) | **Complete** |
 
 ---
 

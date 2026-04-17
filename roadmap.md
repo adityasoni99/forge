@@ -14,6 +14,7 @@
 | **v0.1** | Blueprint Engine + Harness MVP + Factory MVP + Integration | **Complete** |
 | **v0.2** | Skills, tool pool, triggers, parallel runs | **Complete** |
 | **v0.3** | Multi-adapter, warm pools, learning loops, agent plugin | **Complete** (Sub-plans A–E all done) |
+| **v0.3.1** | Agent Plugin System (IDE integration) | **Complete** |
 | **v1.0** | Production-ready factory, docs, community | Planned |
 
 ---
@@ -252,7 +253,21 @@ All v0.3 features have been implemented across Sub-plans A–E:
 | Permission pipeline (deterministic + async) | D | Done |
 | Human/approval node in blueprint engine | D | Done |
 | Shell output compression at tool boundary | B | Done |
-| **Agent plugin system** — deferred to v0.3.1 | — | Planned |
+| **Agent plugin system** | v0.3.1 | **Done** |
+
+---
+
+## v0.3.1 — Agent Plugin System
+
+| Deliverable | Notes |
+|-------------|-------|
+| Plugin types + config | Zero-config defaults, `.forge/plugin.yaml` override |
+| IDE detection | Cursor / Claude Code / Windsurf from env vars |
+| Command registry | `forge_run`, `forge_fix`, `forge_plan` mapping to blueprints |
+| ForgeExecutor | Direct `AgentService` execution, prompt composition |
+| ForgePluginCore | Orchestrates IDE detection, config, command routing |
+| MCP server | stdio transport, `@modelcontextprotocol/sdk`, 4 tools |
+| CLI installer | `forge plugin install --ide auto\|cursor\|claude-code\|windsurf` |
 
 ---
 
@@ -329,4 +344,4 @@ v0.1 Layer 4 + v0.2 implementation plans: `docs/superpowers/plans/*.md`
 6. Reference `project.md` for module map and `docs/design.md` for architecture.
 
 **Current checkpoint:** v0.1 MVP complete. **v0.2 complete.** **v0.3 complete** (all five sub-plans A–E merged to `main`): Sub-plan A — SessionLog, queue shutdown, repo resolver, pipeline wiring; Sub-plan B — multi-adapter harness, prompt stack, compression, proto `adapter` field; Sub-plan C — learning loops (session capture, failure-to-rule, doc-gardening); Sub-plan D — HumanNode, permission pipeline, credential isolation, quality gates; Sub-plan E — SandboxError, WarmPool, lazy provisioning, daemon wiring, container-as-cattle. 127 harness tests, 96+ Go tests.
-**Next action:** Plan **v0.3.1** (Agent Plugin System) or begin **v1.0** planning. See design spec §9 for plugin system deferral notes.
+**Next action:** Begin **v1.0** planning. v0.3.1 (Agent Plugin System) is complete — MCP server, IDE detection, command registry, CLI installer all shipped.

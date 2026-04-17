@@ -275,6 +275,27 @@ curl -X POST http://localhost:8080/api/v1/runs \
 curl http://localhost:8080/api/v1/runs/<run-id>
 ```
 
+### IDE Plugin (MCP)
+
+Install the Forge plugin for your IDE:
+
+```bash
+# Auto-detect IDE
+forge plugin install
+
+# Or specify explicitly
+forge plugin install --ide cursor
+forge plugin install --ide claude-code
+forge plugin install --ide windsurf
+```
+
+After installation, restart your IDE. The following MCP tools become available:
+
+- **forge_run** — Execute a task end-to-end (plan, implement, test, commit)
+- **forge_fix** — Reproduce and fix a bug
+- **forge_plan** — Create an implementation plan without executing
+- **forge_status** — Check plugin configuration and status
+
 ---
 
 ## Blueprint anatomy
@@ -355,7 +376,7 @@ In interactive mode, the handler blocks for human input. In headless/CI mode (`f
 | **v0.1** | Engine + Harness + Factory MVP | **Shipped** | Typed graph engine, YAML parser, gRPC harness, echo + Claude adapters, Docker sandbox, git worktrees, PR delivery, CI/CD |
 | **v0.2** | Skills + Tool Pool + Triggers | **Shipped** | EvalNode, skill system, tool pool with deferred loading, webhook triggers, run queue, `forged` daemon |
 | **v0.3** | Learning + Multi-adapter | **Shipped** | Multi-adapter (Claude, Goose, Codex, Cursor), prompt composition stack, learning loops (session capture, failure-to-rule, doc gardening), human/approval nodes, permission pipeline, credential isolation, quality gates (sprint contracts, skeptical evaluator), warm container pools, lazy provisioning, container-as-cattle error handling. 96+ Go tests (94% coverage), 127 TS tests |
-| **v0.3.1** | Agent Plugin System | Planned | Installable IDE plugins for Cursor / Claude Code / Windsurf with short commands (`/forge run`, `/forge fix`, `/forge plan`) |
+| **v0.3.1** | Agent Plugin System | **Shipped** | MCP server with stdio transport, IDE detection (Cursor / Claude Code / Windsurf), command registry (`forge_run`, `forge_fix`, `forge_plan`, `forge_status`), CLI installer (`forge plugin install --ide auto`) |
 | **v1.0** | Production-ready | Planned | Durable run store (Postgres), WebSocket streaming, web UI, skill marketplace, GitHub Issues triggers, human review queue, run tracing dashboard |
 
 See [roadmap.md](roadmap.md) for the full version map and implementation details.
