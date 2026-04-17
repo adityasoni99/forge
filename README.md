@@ -3,24 +3,26 @@
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Tests](https://img.shields.io/badge/tests-170%2B_passing-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-91%25_Go_|_100%25_TS-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-230%2B_passing-brightgreen)]()
+[![Coverage](https://img.shields.io/badge/coverage-94%25_Go_|_100%25_TS-brightgreen)]()
 
 **Turn any AI coding agent into an autonomous factory that ships mergeable pull requests.**
 
-Forge is a three-layer open-source system that wraps interactive AI assistants -- Claude Code, Goose, Codex, or any agent you build -- in an industrial harness with typed workflow graphs, quality gates, Docker isolation, and automated PR delivery. Give it a task; get back a tested, linted pull request.
+Forge is a three-layer open-source system that wraps interactive AI assistants -- Claude Code, Goose, Codex, Cursor, or any agent you build -- in an industrial harness with typed workflow graphs, quality gates, Docker isolation, learning from failures, and automated PR delivery. Give it a task; get back a tested, linted pull request.
 
 ---
 
 ## Why Forge
 
-- **Agent-agnostic.** Forge doesn't replace your agent -- it orchestrates it. Swap Claude Code for Goose or Codex by changing one adapter flag. The `AgentExecutor` interface means any agent that can take a prompt and return output is a first-class citizen.
+- **Agent-agnostic.** Forge doesn't replace your agent -- it orchestrates it. Swap Claude Code for Goose, Codex, or Cursor by changing one adapter flag. Each adapter declares its capabilities (streaming, max tokens, tool support), and Forge adapts automatically.
 
-- **Deterministic quality gates.** Every AI-generated change passes through lint and test gates enforced by a typed state machine -- not by hoping the agent remembers to run tests. Gates loop back to the agent on failure with bounded retries.
+- **Deterministic quality gates.** Every AI-generated change passes through lint and test gates enforced by a typed state machine -- not by hoping the agent remembers to run tests. Gates loop back to the agent on failure with bounded retries. Sprint contracts and a skeptical evaluator system provide configurable acceptance criteria.
 
-- **Factory-scale isolation.** Each run gets its own git worktree and Docker container with configurable resource limits and network policy. Run dozens of tasks in parallel without cross-contamination.
+- **Self-improving.** Failed runs automatically derive prevention rules written to `.forge/rules/`. A doc-gardening agent detects stale documentation. Session event logs enable cross-run learning. The system gets smarter with every failure.
 
-- **Declarative workflows.** Define agent pipelines in YAML -- plan, implement, lint, test, commit -- as directed graphs. No imperative glue code. Compose, version, and share blueprints like infrastructure-as-code.
+- **Factory-scale isolation.** Each run gets its own git worktree and Docker container with configurable resource limits, network policy, and credential isolation. Warm container pools and lazy provisioning minimize startup latency. Run dozens of tasks in parallel without cross-contamination.
+
+- **Declarative workflows.** Define agent pipelines in YAML -- plan, implement, lint, test, human review, commit -- as directed graphs. Human/approval nodes block for input in interactive mode and auto-deny in CI. No imperative glue code. Compose, version, and share blueprints like infrastructure-as-code.
 
 ---
 
@@ -29,22 +31,25 @@ Forge is a three-layer open-source system that wraps interactive AI assistants -
 ```text
 +------------------------------------------------------------------+
 |                        Layer 3: Factory (Go)                     |
-|  Docker sandbox | git worktrees | PR delivery | run queue        |
-|  webhook triggers | forged daemon | task assignment              |
+|  Docker sandbox | warm container pools | git worktrees           |
+|  PR delivery | run queue | webhook triggers | forged daemon      |
+|  session event log | lazy provisioning | task assignment          |
 +----------------------------------+-------------------------------+
                                    |
                                    v
 +----------------------------------+-------------------------------+
 |                   Layer 2: Intelligence Harness (TypeScript)      |
-|  gRPC agent service | adapters (Claude, Echo, ...) | context     |
-|  skill system | tool pool | quality gates                        |
+|  gRPC agent service | multi-adapter (Claude, Goose, Codex, ...)  |
+|  prompt composition stack | skill system | tool pool              |
+|  learning loops | quality gates | shell output compression       |
 +----------------------------------+-------------------------------+
                                    |
                                    v
 +----------------------------------+-------------------------------+
 |                   Layer 1: Blueprint Engine (Go)                 |
 |  YAML graph parser | typed state machine | agentic nodes         |
-|  deterministic nodes | gate nodes | eval nodes | iteration guard |
+|  deterministic nodes | gate nodes | eval nodes | human nodes     |
+|  permission pipeline | iteration guard                           |
 +------------------------------------------------------------------+
 ```
 
@@ -87,6 +92,7 @@ Forge synthesizes proven patterns from production agent systems:
 
 - **Stripe Minions** -- blueprint-as-state-machine, curated tool subsets, bounded CI retries
 - **Anthropic harness design** -- planner/generator/evaluator separation, sprint contracts, context resets
+- **Anthropic Managed Agents** -- brain-hands-session decoupling, containers as cattle, lazy provisioning, durable session event logs, credential isolation
 - **OpenAI harness engineering** -- AGENTS.md as table of contents, layered architecture, linter output as remediation signal
 
 ---
@@ -95,9 +101,11 @@ Forge synthesizes proven patterns from production agent systems:
 
 ### Layer 1: Blueprint Engine
 
-- Typed DAG engine with four node types: **agentic** (LLM agent), **deterministic** (shell commands), **gate** (conditional pass/fail routing), **eval** (evaluation/grading)
+- Typed DAG engine with five node types: **agentic** (LLM agent), **deterministic** (shell commands), **gate** (conditional pass/fail routing), **eval** (evaluation/grading), **human** (approval/review gates)
 - Two-phase YAML parser with `depends_on` vocabulary for declaring node dependencies
 - Gate nodes enforce bounded iteration limits -- no infinite retry loops
+- **Human/approval nodes** with configurable timeout, headless auto-deny for CI, and pluggable `ApprovalHandler` (CLI, webhook, Slack)
+- **Permission pipeline**: two-phase (deterministic glob rules + async human escalation) with credential isolation
 - `AgentExecutor` interface decouples the engine from any specific agent implementation
 - Built-in blueprints: `standard-implementation` (plan -> implement -> lint -> test -> commit) and `bug-fix` (reproduce -> fix -> test -> commit)
 - Concurrent node execution for independent graph branches
@@ -105,23 +113,30 @@ Forge synthesizes proven patterns from production agent systems:
 ### Layer 2: Intelligence Harness
 
 - gRPC `ForgeAgent` service consumed by the Go engine via `GrpcAgentExecutor`
-- Agent adapters: **Echo** (testing), **Claude Code** (headless CLI)
+- **Multi-adapter system**: capability-aware streaming protocol with 5 adapters -- **Echo** (testing), **Claude Code**, **Goose**, **Codex**, **Cursor** -- each declaring capabilities (streaming, interrupt, max tokens, tool support)
+- **Prompt composition stack**: 5-level priority system (override > coordinator > agent-specific > project rules > default baseline) with budget-aware truncation based on adapter capabilities
+- **Shell output compression**: keeps error/warning lines, headers, summaries; collapses verbose middle sections
 - Context loader: reads `AGENTS.md` and `.forge/rules/` to compose scoped prompts
+- **Learning loops**: durable session event capture, failure-to-rule pipeline (failed runs automatically derive prevention rules written to `.forge/rules/`), doc-gardening agent for stale documentation detection
+- **Quality gate system**: sprint contract negotiation, skeptical evaluator with configurable criteria, retry + human escalation
 - Skill system: filesystem-scanned registry, keyword-based resolver, lifecycle management (evaluate, promote, compare)
 - Tool pool: assembly with deferred loading against a context budget, pre/post execution hooks
 - Subagent context isolation for parallel agent invocations
 
 ### Layer 3: Factory
 
-- Docker sandbox with volume mounts, environment injection, resource limits, and network policy
+- Docker sandbox with volume mounts, environment injection, resource limits, network policy, and **credential isolation** (env vars matching `*_KEY`, `*_SECRET`, `*_TOKEN`, `*_PASSWORD` are filtered unless allow-listed)
+- **Container warm pools**: pre-heated Docker containers for fast acquisition (target: under 10s); `Acquire`/`Release`/`Shutdown` lifecycle with workspace reset on return; configurable pool size via `--warm-pool-size`
+- **Lazy sandbox provisioning**: defers `EnsureImage` until the first sandbox-bound node runs, removing container setup from the critical path (follows Anthropic's ~60% p50 TTFT improvement pattern)
+- **Container-as-cattle error handling**: container failures (OOM, crash, timeout) are `NodeResult{Failed}`, not pipeline crashes; failed containers are discarded, not debugged
 - Git worktree manager for branch-isolated parallel runs
 - PR delivery pipeline: `git push` + `gh pr create`
-- Run queue with bounded concurrency (configurable `maxParallel` workers) and **graceful shutdown** (`Shutdown` drains in-flight work)
+- Run queue with bounded concurrency (configurable `maxParallel` workers) and **graceful shutdown** (`Shutdown` drains in-flight work, stops warm pool containers)
 - In-memory run registry with concurrent-safe state tracking
 - Rule-based task assigner wired into the pipeline (default adapter when none specified)
-- Durable **session event log** (`SessionLog` / file JSONL) for run lifecycle events (foundation for learning loops)
+- Durable **session event log** (`SessionLog` / file JSONL) for run lifecycle events, enabling learning loops and restart recovery
 - Webhook HTTP trigger: `POST /api/v1/runs` to enqueue, `GET /api/v1/runs/:id` to poll; optional **`repo_url`** resolved to a cached bare clone via `GitRepoResolver`
-- `forged` daemon: production pipeline wiring (Docker + worktree + delivery), or **`--dry-run`** for log-only runs; flags for session log dir and repo cache (`--sessions-dir`, `--repo-cache-dir`); signal handling with queue + HTTP shutdown
+- `forged` daemon: production pipeline wiring (Docker + worktree + delivery), or **`--dry-run`** for log-only runs; flags for warm pools, lazy sandbox, session log dir, and repo cache; signal handling with queue + pool + HTTP shutdown
 
 ---
 
@@ -181,9 +196,9 @@ Runs inside an isolated container with the echo adapter:
 go run ./cmd/forge run --adapter echo --no-pr "add retry logic to the HTTP client"
 ```
 
-### Claude Code agent run
+### Full agent run
 
-Full autonomous pipeline with a real agent:
+Full autonomous pipeline with a real agent (Claude Code, Goose, Codex, or Cursor):
 
 ```bash
 go run ./cmd/forge run --adapter claude --no-pr "implement the caching layer from the design doc"
@@ -202,6 +217,18 @@ FORGE_ADAPTER=claude FORGE_HARNESS_PORT=50051 npm start
 go run ./cmd/forge run --no-sandbox --harness 127.0.0.1:50051 --adapter claude "implement the caching layer"
 ```
 
+### Multi-adapter selection
+
+Forge supports multiple AI agents. Choose one per run:
+
+```bash
+go run ./cmd/forge run --adapter claude "implement the caching layer"
+go run ./cmd/forge run --adapter goose "fix the nil pointer in ParseConfig"
+go run ./cmd/forge run --adapter codex "add retry logic to the HTTP client"
+```
+
+The `TaskAssigner` automatically selects an adapter when none is specified. Configure via `FORGE_ADAPTER` env var or blueprint config.
+
 ### Daemon mode (webhook-triggered)
 
 Run `forged` as a long-lived service accepting tasks via HTTP. By default it runs the **full factory pipeline** (Docker sandbox, git worktree, optional PR). Use **`--dry-run`** to log tasks without Docker/git (useful for smoke tests):
@@ -215,7 +242,28 @@ go run ./cmd/forged -port 8080 -max-parallel 4
 go run ./cmd/forged --dry-run -port 8080
 ```
 
-Session JSONL and repo clone cache directories default to `.forge/sessions` and `.forge/repo-cache` (override with `--sessions-dir` / `FORGED_SESSIONS_DIR`, `--repo-cache-dir` / `FORGED_REPO_CACHE`).
+#### Warm pools and lazy provisioning
+
+Pre-heat Docker containers for faster run startup. Lazy provisioning defers container setup until the first sandbox-bound node (enabled by default):
+
+```bash
+# Pre-heat 3 warm containers
+go run ./cmd/forged -port 8080 -warm-pool-size 3 -warm-pool-image forge:latest
+
+# Disable lazy provisioning (eager sandbox setup)
+go run ./cmd/forged -port 8080 -lazy-sandbox=false
+```
+
+| Flag | Env var | Default | Description |
+|------|---------|---------|-------------|
+| `-port` | `FORGED_PORT` | `8080` | HTTP listen port |
+| `-max-parallel` | `FORGED_MAX_PARALLEL` | `2` | Max concurrent runs |
+| `-warm-pool-size` | `FORGED_WARM_POOL_SIZE` | `0` (disabled) | Pre-heated container count |
+| `-warm-pool-image` | `FORGED_WARM_POOL_IMAGE` | `forge:latest` | Image for warm containers |
+| `-lazy-sandbox` | — | `true` | Defer sandbox setup until first use |
+| `-sessions-dir` | `FORGED_SESSIONS_DIR` | `.forge/sessions` | Session JSONL directory |
+| `-repo-cache-dir` | `FORGED_REPO_CACHE` | `.forge/repo-cache` | Bare clone cache |
+| `-dry-run` | — | `false` | Log-only pipeline (no Docker/git) |
 
 ```bash
 # Enqueue a run
@@ -279,16 +327,36 @@ edges:
 
 Gate nodes route `pass` to the next stage and `fail` back to the agent for correction, with bounded iteration limits preventing infinite loops.
 
+### Human approval nodes
+
+Blueprints can include human review gates that block until approved:
+
+```yaml
+nodes:
+  approve_pr:
+    type: human
+    config:
+      prompt: "Review and approve the generated PR"
+      timeout: 3600
+edges:
+  - { from: test_gate, to: approve_pr, condition: pass }
+  - { from: approve_pr, to: commit, condition: pass }
+  - { from: approve_pr, to: implement, condition: fail }
+```
+
+In interactive mode, the handler blocks for human input. In headless/CI mode (`forged`), human nodes auto-deny to prevent blocking.
+
 ---
 
 ## Project Status
 
 | Version | Theme | Status | Highlights |
 |---------|-------|--------|------------|
-| **v0.1** | Engine + Harness + Factory MVP | **Shipped** | Typed graph engine, YAML parser, gRPC harness, echo + Claude adapters, Docker sandbox, git worktrees, PR delivery, CI/CD, 75+ Go tests (91% coverage), 21 TS tests (100% coverage) |
-| **v0.2** | Skills + Tool Pool + Triggers | **Shipped** | EvalNode, skill system (registry/resolver/lifecycle), tool pool with deferred loading, subagent context isolation, webhook triggers, run queue with bounded concurrency, `forged` daemon, 88+ Go tests, 75+ TS tests |
-| **v0.3** | Learning + Multi-adapter | Planned | Memory/session capture, failure-to-rule pipeline, Goose/Codex/Cursor adapters, container warm pools, quality gate system |
-| **v1.0** | Production-ready | Planned | Built-in skill marketplace, full docs, GitHub Issues triggers, human review queue, run tracing dashboard |
+| **v0.1** | Engine + Harness + Factory MVP | **Shipped** | Typed graph engine, YAML parser, gRPC harness, echo + Claude adapters, Docker sandbox, git worktrees, PR delivery, CI/CD |
+| **v0.2** | Skills + Tool Pool + Triggers | **Shipped** | EvalNode, skill system, tool pool with deferred loading, webhook triggers, run queue, `forged` daemon |
+| **v0.3** | Learning + Multi-adapter | **Shipped** | Multi-adapter (Claude, Goose, Codex, Cursor), prompt composition stack, learning loops (session capture, failure-to-rule, doc gardening), human/approval nodes, permission pipeline, credential isolation, quality gates (sprint contracts, skeptical evaluator), warm container pools, lazy provisioning, container-as-cattle error handling. 96+ Go tests (94% coverage), 127 TS tests |
+| **v0.3.1** | Agent Plugin System | Planned | Installable IDE plugins for Cursor / Claude Code / Windsurf with short commands (`/forge run`, `/forge fix`, `/forge plan`) |
+| **v1.0** | Production-ready | Planned | Durable run store (Postgres), WebSocket streaming, web UI, skill marketplace, GitHub Issues triggers, human review queue, run tracing dashboard |
 
 See [roadmap.md](roadmap.md) for the full version map and implementation details.
 
